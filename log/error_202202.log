@@ -1,0 +1,2 @@
+[2022-02-23 16:55:15][mysql.Conn.defer] runtime error: invalid memory address or nil pointer dereference
+[2022-02-23 16:55:15][mysql.Query.defer] runtime error: invalid memory address or nil pointer dereference
