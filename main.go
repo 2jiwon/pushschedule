@@ -117,18 +117,19 @@ func CheckScheduledPushData() {
 
 // 앱 아이디 기준으로 테이블 이름 가져오기
 func GetTable(tb_name string, app_id string) string {
-	tb_name += string(app_id[0])
 	// a-z가 아닐 경우
-	test, _ := regexp.MatchString("[a-z]", tb_name)
+	test, _ := regexp.MatchString("^[a-z]", app_id)
 	if test == false {
 		tb_name += "0"
+	} else {
+		tb_name += string(app_id[0])
 	}
 	return tb_name
 }
 
 // 메시지 전송 데이터 삽입하기
 func InsertPushMSGSendsData(push_idx int, app_id string) {
-	users_table := GetTable("users_", app_id)
+	users_table := GetTable("push_users_", app_id)
 	msg_table := GetTable("push_msg_sends_", app_id)
 
 	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s'", users_table, app_id)
