@@ -158,13 +158,17 @@ func Insert(tb string, f map[string]interface{}, re bool) (int, int) {
 			helper.Log("error", "mysql.Insert-Exec", fmt.Sprintf("%s", err))
 		} else {
 			n, err := res.RowsAffected()
-			id, _ := res.LastInsertId()
 			if err != nil {
-				helper.Log("error", "mysql.Insert-Exec", fmt.Sprintf("%s", err))
+				helper.Log("error", "mysql.Insert-RowsAffected", fmt.Sprintf("%s", err))
 			} else {
 				if n > 0 {
 					if re == true {
-						return int(n), int(id)
+						id, err := res.LastInsertId()
+						if err != nil {
+							helper.Log("error", "mysql.Insert-LastInsertId", fmt.Sprintf("%s", err))
+						} else {
+							return int(n), int(id)
+						}
 					} else {
 						return int(n), 0
 					}
