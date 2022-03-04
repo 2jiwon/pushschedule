@@ -2,7 +2,6 @@ package part
 
 import (
 	"fmt"
-	"pushschedule/src/common"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
 	"strconv"
@@ -60,8 +59,35 @@ import (
 					helper.Log("error", "retarget_queue.CheckScheduledPushData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
 				} else {
 					// push_msg_sends_ 에 데이터 삽입
-					go common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
+					go InsertOnePushMSGSendsData(res_idx, mrow["app_id"], mrow["app_udid"])
 				}
+			}
+		}
+	}
+}
+
+// 메시지 전송 데이터 삽입하기
+func InsertOnePushMSGSendsData(push_idx int, app_id string, app_udid string) {
+	fmt.Println("insert 시작")
+	push_users_table := helper.GetTable("push_users_", app_id)
+	push_msg_table := helper.GetTable("push_msg_sends_", app_id)
+
+	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s' AND app_udid = '%s'", push_users_table, app_id, app_udid)
+	mrows, tRecord := mysql.Query("master", sql)
+	if tRecord > 0 {
+		for _, mrow := range mrows {
+			data := map[string]interface{}{
+				"push_idx":   push_idx,
+				"app_id":     mrow["app_id"],
+				"app_udid":   mrow["app_udid"],
+				"mem_id":     mrow["app_shop_id"],
+				"shop_no":    mrow["app_shop_no"],
+				"push_token": mrow["device_id"],
+				"app_os":     helper.ConvOS(mrow["app_os"]),
+			}
+			res, _ := mysql.Insert("master", push_msg_table, data, false)
+			if res < 1 {
+				helper.Log("error", "retarget_queue.InsertOnePushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
 			}
 		}
 	}
