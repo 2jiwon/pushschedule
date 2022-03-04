@@ -28,7 +28,6 @@ func Conn(connection string) (*sql.DB, error) {
 			helper.Log("error", "mysql.Conn.defer", fmt.Sprintf("%s", r))
 		}
 	}()
-
 	db, err := sql.Open(
 		"mysql",
 		fmt.Sprintf(
@@ -51,9 +50,10 @@ func Conn(connection string) (*sql.DB, error) {
  * mysql query
  *
  * @param
+ *     string connName 커넥션 명
  *     string sql 쿼리문
  */
-func Query(sql string) (ret []map[string]string, totalRecord int) {
+func Query(connName string, sql string) (ret []map[string]string, totalRecord int) {
 	//fmt.Printf("Query:%#v\n", sql)
 	ret = []map[string]string{}
 	totalRecord = 0
@@ -62,12 +62,11 @@ func Query(sql string) (ret []map[string]string, totalRecord int) {
 			helper.Log("error", "mysql.Query.defer", fmt.Sprintf("%s", r))
 		}
 	}()
-	db, err := Conn("master")
+	db, err := Conn(connName)
 	defer db.Close()
 	if err != nil {
 		helper.Log("error", "mysql.Query-Conn", fmt.Sprintf("%s", err))
 	} else {
-
 		rows, err := db.Query(sql)
 		defer rows.Close()
 
@@ -75,7 +74,6 @@ func Query(sql string) (ret []map[string]string, totalRecord int) {
 			helper.Log("error", "mysql.Query", fmt.Sprintf("%s", err))
 		} else {
 			defer rows.Close()
-			//var app_id string
 			columns, err := rows.Columns()
 			if err != nil {
 				return
@@ -94,7 +92,7 @@ func Query(sql string) (ret []map[string]string, totalRecord int) {
 					case []uint8:
 						retRow[col] = string(val.([]uint8))
 					default:
-						retRow[col] = fmt.Sprintf("%s", val) //string(val)
+						retRow[col] = fmt.Sprintf("%s", val)
 					}
 				}
 				ret = append(ret, retRow)
@@ -105,9 +103,9 @@ func Query(sql string) (ret []map[string]string, totalRecord int) {
 	return ret, totalRecord
 }
 
-func GetRow(sql string) (row map[string]string, rowCnt int) {
+func GetRow(connName string, sql string) (row map[string]string, rowCnt int) {
 	rowCnt = 0
-	result, totalRecord := Query(sql)
+	result, totalRecord := Query(connName, sql)
 	if totalRecord > 0 {
 		rowCnt = 1
 		row = result[0]
@@ -115,8 +113,8 @@ func GetRow(sql string) (row map[string]string, rowCnt int) {
 	return row, rowCnt
 }
 
-func GetOne(sql string) string {
-	result, totalRecord := Query(sql)
+func GetOne(connName string, sql string) string {
+	result, totalRecord := Query(connName, sql)
 	if totalRecord > 0 {
 		row := result[0]
 		for _, val := range row {
@@ -130,17 +128,18 @@ func GetOne(sql string) string {
  * mysql insert
  *
  * @param
+ *     string connName 커넥션 명
  *     string tb 테이블명
  *     map f 	 필드 내용
  *	   bool re   idx 반환 여부
  */
-func Insert(tb string, f map[string]interface{}, re bool) (int, int) {
+func Insert(connName string, tb string, f map[string]interface{}, re bool) (int, int) {
 	defer func() { //전역 에러 처리 및 복원
 		if r := recover(); r != nil {
 			helper.Log("error", "mysql.Insert.defer", fmt.Sprintf("%s", r))
 		}
 	}()
-	db, err := Conn("master")
+	db, err := Conn(connName)
 	defer db.Close()
 	if err != nil {
 		helper.Log("error", "mysql.Insert-Conn", fmt.Sprintf("%s", err))
@@ -183,17 +182,18 @@ func Insert(tb string, f map[string]interface{}, re bool) (int, int) {
  * mysql update
  *
  * @param
+ *     string connName 커넥션 명
  *     string tb 테이블명
  *     map f 업데이트할 필드 내용
  *     string w where
  */
-func Update(tb string, f map[string]string, w string) int {
+func Update(connName string, tb string, f map[string]string, w string) int {
 	defer func() { //전역 에러 처리 및 복원
 		if r := recover(); r != nil {
 			helper.Log("error", "mysql.Update.defer", fmt.Sprintf("%s", r))
 		}
 	}()
-	db, err := Conn("master")
+	db, err := Conn(connName)
 	defer db.Close()
 	if err != nil {
 		helper.Log("error", "mysql.Update-Conn", fmt.Sprintf("%s", err))
@@ -220,4 +220,32 @@ func Update(tb string, f map[string]string, w string) int {
 		}
 	}
 	return 0
+}
+
+
+// 메시지 전송 데이터 삽입하기
+func InsertPushMSGSendsData(push_idx int, app_id string) {
+	fmt.Println("insert 시작")
+	push_users_table := helper.GetTable("push_users_", app_id)
+	push_msg_table := helper.GetTable("push_msg_sends_", app_id)
+
+	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s'", push_users_table, app_id)
+	mrows, tRecord := Query("master", sql)
+	if tRecord > 0 {
+		for _, mrow := range mrows {
+			data := map[string]interface{}{
+				"push_idx":   push_idx,
+				"app_id":     mrow["app_id"],
+				"app_udid":   mrow["app_udid"],
+				"mem_id":     mrow["app_shop_id"],
+				"shop_no":    mrow["app_shop_no"],
+				"push_token": mrow["device_id"],
+				"app_os":     helper.ConvOS(mrow["app_os"]),
+			}
+			res, _ := Insert("master", push_msg_table, data, false)
+			if res < 1 {
+				helper.Log("error", "scheduled_push.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
+			}
+		}
+	}
 }
