@@ -30,22 +30,20 @@ import (
 	push_msg_data_table := "push_msg_data"
 
 	// 리타겟큐 테이블에서 데이터 가져오기
-	retarget_queue_table := "BYAPPS_retarget_queue"
-	fmt.Println("here")
-	
+	retarget_queue_table := "BYAPPS_retarget_queue"	
 	sql := fmt.Sprintf("SELECT * FROM %s WHERE schedule_time like '%s'", retarget_queue_table, formatted_hour + "%")
 	mrows, tRecord := mysql.Query("ma", sql)
 	if tRecord > 0 {
 		for _, mrow := range mrows {
 			fmt.Println("schedule_time: ", mrow["schedule_time"])
-			// 예약된 시간과 현재 시간이 동일하면 push_msg_data에 데이터 삽입
+			// 예약된 시간과 현재로부터 1분 후 시간이 동일하면 push_msg_data에 데이터 삽입
 			if mrow["schedule_time"] == formatted_min {	
 				fmt.Println("yes")
 				f := map[string]interface{}{
 					"app_id":        mrow["app_id"],
 					"push_type":     "retarget",
 					"msg_type":      "retarget",
-					"server_group":  mrow["send_no"],
+					"server_group":  helper.GetRandom(),
 					"app_lang":      mrow["lang"],
 					"os":            helper.ConvOS(mrow["app_os"]),
 					"title":         mrow["product_name"],
