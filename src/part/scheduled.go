@@ -1,10 +1,10 @@
-package scheduled
+package part
 
 import (
 	"fmt"
+	"pushschedule/src/common"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -38,7 +38,7 @@ import (
 	// 스케쥴 테이블에서 데이터 가져오기
 	push_schedule_data_table := "BYAPPS2015_push_schedule_data"
 	sql := fmt.Sprintf("SELECT * FROM %s", push_schedule_data_table)
-	mrows, tRecord := mysql.Query(sql)
+	mrows, tRecord := mysql.Query("master", sql)
 	if tRecord > 0 {
 		for _, mrow := range mrows {
 			if evenWeek == true { // 이번주가 짝수 주이면
@@ -95,50 +95,12 @@ import (
 				"schedule_time": strconv.FormatInt(five_mins_later_timestamp, 10),
 				"reg_time":      strconv.FormatInt(now_timestamp, 10),
 			}
-			res, res_idx := mysql.Insert(push_msg_data_table, f, true)
+			res, res_idx := mysql.Insert("master", push_msg_data_table, f, true)
 			if res < 1 {
-				helper.Log("error", "scheduled_push.CheckScheduledPushData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
+				helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
 			} else {
 				// push_msg_sends_ 에 데이터 삽입
-				InsertPushMSGSendsData(res_idx, mrow["app_id"])
-			}
-		}
-	}
-}
-
-// 앱 아이디 기준으로 테이블 이름 가져오기
-func GetTable(tb_name string, app_id string) string {
-	// a-z가 아닐 경우
-	test, _ := regexp.MatchString("^[a-z]", app_id)
-	if test == false {
-		tb_name += "0"
-	} else {
-		tb_name += string(app_id[0])
-	}
-	return tb_name
-}
-
-// 메시지 전송 데이터 삽입하기
-func InsertPushMSGSendsData(push_idx int, app_id string) {
-	push_users_table := GetTable("push_users_", app_id)
-	push_msg_table := GetTable("push_msg_sends_", app_id)
-
-	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s'", push_users_table, app_id)
-	mrows, tRecord := mysql.Query(sql)
-	if tRecord > 0 {
-		for _, mrow := range mrows {
-			data := map[string]interface{}{
-				"push_idx":   push_idx,
-				"app_id":     mrow["app_id"],
-				"app_udid":   mrow["app_udid"],
-				"mem_id":     mrow["app_shop_id"],
-				"shop_no":    mrow["app_shop_no"],
-				"push_token": mrow["device_id"],
-				"app_os":     helper.ConvOS(mrow["app_os"]),
-			}
-			res, _ := mysql.Insert(push_msg_table, data, false)
-			if res < 1 {
-				helper.Log("error", "scheduled_push.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
+				go common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
 			}
 		}
 	}
