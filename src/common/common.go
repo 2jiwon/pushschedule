@@ -27,7 +27,7 @@ func InsertPushMSGSendsData(push_idx int, app_id string) {
 			}
 			res, _ := mysql.Insert("master", push_msg_table, data, false)
 			if res < 1 {
-				helper.Log("error", "scheduled_push.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
+				helper.Log("error", "common.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
 			}
 		}
 	}
