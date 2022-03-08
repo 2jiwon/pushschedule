@@ -1,7 +1,10 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
 )
@@ -31,4 +34,40 @@ func InsertPushMSGSendsData(push_idx int, app_id string) {
 			}
 		}
 	}
+}
+
+// cafe24 token 정보 가져오기
+func GetCafe24ApiInfo(app_id string) map[string]string {
+	cafe24Api_table := "BYAPPS_cafe24_api_token"
+	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s'", cafe24Api_table, app_id)
+	mrow, tRecord := mysql.GetRow("master", sql)
+	if tRecord > 0 {
+		return mrow
+	} else {
+		helper.Log("error", "common.GetCafe24ApiInfo", fmt.Sprintf("카페24 API 정보 취득 실패-%s", mrow))
+	}
+	return map[string]string{}
+}
+
+// cafe24 api call
+func CallCafe24Api(method string, url string, token string) (map[string]interface{}, error) {
+	request, err := http.NewRequest(method, url, nil)
+    if err != nil {
+        return nil, err
+    }
+	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+    client := &http.Client{}
+    response, err := client.Do(request)
+    if err != nil {
+        return nil, err
+    }
+    defer response.Body.Close()
+
+	responseBody, _ := ioutil.ReadAll(response.Body)
+    var responseJson map[string]interface{}
+    err = json.Unmarshal(responseBody, &responseJson)
+    if err != nil {
+        return nil, err
+    }
+    return responseJson, nil
 }
