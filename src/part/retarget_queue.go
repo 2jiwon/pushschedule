@@ -58,7 +58,7 @@ import (
 
 			// 예약된 시간과 현재로부터 1분 후 시간이 동일하면 push_msg_data에 데이터 삽입
 			fmt.Println("schedule_time: ", mrow["schedule_time"])
-			if mrow["schedule_time"] == formatted_min {
+			if mrow["schedule_time"] <= formatted_min {
 				d := map[string]interface{}{
 					"state" : "R",
 				}
