@@ -187,7 +187,7 @@ func Insert(connName string, tb string, f map[string]interface{}, re bool) (int,
  *     map f 업데이트할 필드 내용
  *     string w where
  */
-func Update(connName string, tb string, f map[string]string, w string) int {
+func Update(connName string, tb string, f map[string]interface{}, w string) int {
 	defer func() { //전역 에러 처리 및 복원
 		if r := recover(); r != nil {
 			helper.Log("error", "mysql.Update.defer", fmt.Sprintf("%s", r))
@@ -211,7 +211,7 @@ func Update(connName string, tb string, f map[string]string, w string) int {
 		} else {
 			n, err := res.RowsAffected()
 			if err != nil {
-				helper.Log("error", "mysql.Update-Exec", fmt.Sprintf("%s", err))
+				helper.Log("error", "mysql.Update-RowsAffected", fmt.Sprintf("%s", err))
 			} else {
 				if n > 0 {
 					return int(n)
@@ -223,29 +223,3 @@ func Update(connName string, tb string, f map[string]string, w string) int {
 }
 
 
-// 메시지 전송 데이터 삽입하기
-func InsertPushMSGSendsData(push_idx int, app_id string) {
-	fmt.Println("insert 시작")
-	push_users_table := helper.GetTable("push_users_", app_id)
-	push_msg_table := helper.GetTable("push_msg_sends_", app_id)
-
-	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s'", push_users_table, app_id)
-	mrows, tRecord := Query("master", sql)
-	if tRecord > 0 {
-		for _, mrow := range mrows {
-			data := map[string]interface{}{
-				"push_idx":   push_idx,
-				"app_id":     mrow["app_id"],
-				"app_udid":   mrow["app_udid"],
-				"mem_id":     mrow["app_shop_id"],
-				"shop_no":    mrow["app_shop_no"],
-				"push_token": mrow["device_id"],
-				"app_os":     helper.ConvOS(mrow["app_os"]),
-			}
-			res, _ := Insert("master", push_msg_table, data, false)
-			if res < 1 {
-				helper.Log("error", "scheduled_push.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
-			}
-		}
-	}
-}
