@@ -84,7 +84,6 @@ func GetTable(tb_name string, app_id string) string {
 
 /*
 * 서버그룹 랜덤으로 지정
-* 
 */
 func GetRandom() int {
 	max := 2
