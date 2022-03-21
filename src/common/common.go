@@ -77,25 +77,27 @@ func CallCafe24Api(method string, url string, token string) (map[string]interfac
 type ProductData struct {
 	Result  int    `json:"result"`
 	Message string `json:"message"`
-	Pds     []struct {
-		AppID      string `json:"app_id"`
-		State      string `json:"state"`
-		Code       int    `json:"code"`
-		Name       string `json:"name"`
-		Price      int    `json:"price"`
-		Thum       string `json:"thum"`
-		Link       string `json:"link"`
-		Linkm      string `json:"linkm"`
-		Hits       int    `json:"hits"`
-		PdUtime    int    `json:"pd_utime"`
-		PdRtime    int    `json:"pd_rtime"`
-		UpdateTime int    `json:"update_time"`
-		Idx        int    `json:"idx"`
-	} `json:"pds"`
+	Pds []PDS `json:"pds"`
 	Request struct {
 		Op    string `json:"op"`
 		AppID string `json:"app_id"`
 	} `json:"request"`
+}
+
+type PDS struct {
+	AppID      string `json:"app_id"`
+	State      string `json:"state"`
+	Code       int    `json:"code"`
+	Name       string `json:"name"`
+	Price      int    `json:"price"`
+	Thum       string `json:"thum"`
+	Link       string `json:"link"`
+	Linkm      string `json:"linkm"`
+	Hits       int    `json:"hits"`
+	PdUtime    int    `json:"pd_utime"`
+	PdRtime    int    `json:"pd_rtime"`
+	UpdateTime int    `json:"update_time"`
+	Idx        int    `json:"idx"`
 }
 
 func CallByappsApi(method string, url string, key string) (ProductData, error) {
@@ -120,12 +122,49 @@ func CallByappsApi(method string, url string, key string) (ProductData, error) {
     return responseJson, nil
 }
 
-func GetProductFromByapps(app_id string, action_type string, code string) ProductData {
-	URL := config.Get("PRODUCT_API_" + strings.ToUpper(config.Get("MODE"))) + "/index.php?op=new&app_id=" + app_id
-	res, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
+func GetProductFromByapps(app_id string, action_type string, code string) []PDS {
+	URL := ""
+	if len(code) == 0 {
+		URL = config.Get("PRODUCT_API_" + strings.ToUpper(config.Get("MODE"))) + "/index.php?op=new&app_id=" + app_id
+	} else {
+		URL = config.Get("PRODUCT_API_" + strings.ToUpper(config.Get("MODE"))) + "/index.php?op=product&app_id=" + app_id + "&code=" + code
+	}
+	
+	pdata, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
     if err != nil {
-		helper.Log("error", "common.GetNewProductFromByapps", "BYAPPS API 서버 탐색 실패")
-        return ProductData{}
+		helper.Log("error", "common.GetProductFromByapps", "BYAPPS API 서버 탐색 실패")
+        return nil
     }
-    return res
+    if pdata.Result == 0 {
+		helper.Log("error", "common.GetProductFromByapps", "상품정보 없음")
+		return nil
+	}
+
+	// action_type이 custom(선택상품)일때는 code로 상품정보 가져오고
+	// best는 hit가 가장 높은 걸로, product는 new에서 가장 최신으로
+	if action_type == "best" {
+		best := pdata.Pds[0]
+		for i := 1; i < len(pdata.Pds); i++ {
+			if pdata.Pds[i].Hits > best.Hits {
+				best = pdata.Pds[i]
+			}
+		}
+		r:=[]PDS{
+			best,
+		}
+		return r
+	} else if action_type == "product" {
+		new := pdata.Pds[0]
+		for i := 1; i < len(pdata.Pds); i++ {
+			if pdata.Pds[i].PdRtime > new.PdRtime {
+				new = pdata.Pds[i]
+			}
+		}
+		r:=[]PDS{
+			new,
+		}
+		return r
+	} else {
+		return pdata.Pds
+	}
 }
