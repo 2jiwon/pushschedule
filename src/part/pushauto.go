@@ -6,7 +6,6 @@ import (
 	"pushschedule/src/common"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -80,17 +79,14 @@ import (
 
 			// 상품 정보를 가져와서 만약 result가 0이면 다음으로 패스
 			result := GetProductData(mrow)
-			fmt.Println("상품정보: ", reflect.ValueOf(result))
-
-			if result.Result == 0 {
+			// fmt.Println("상품정보: ", reflect.ValueOf(result))
+			if len(result.Name) == 0 {
 				continue
 			}
-			fmt.Println("상품명: ", result.Pds[0].Name)
-			
 
 		    // 메시지에 변수 포함되어있으면 치환
-			// msg := ConvertProductInfo(mrow["msg"], result["name"], result["price"])
-			// ios_msg := ConvertProductInfo(mrow["ios_msg"], result["name"], result["price"])
+			msg := ConvertProductInfo(mrow["msg"], result.Name, strconv.Itoa(result.Price))
+			ios_msg := ConvertProductInfo(mrow["msg"], result.Name, strconv.Itoa(result.Price))
 
 			// push_msg_data에 데이터 삽입
 			f := map[string]interface{}{
@@ -102,8 +98,8 @@ import (
 				"os":            helper.ConvOS(mrow["os"]),
 				"title":         mrow["title"],
 				"notice_title":  mrow["notice_title"],
-				// "msg":           msg,
-				// "ios_msg":       ios_msg,
+				"msg":           msg,
+				"ios_msg":       ios_msg,
 				"attach_img":    mrow["attach_img"],
 				"link_url":      mrow["link_url"],
 				"gcm_color":     mrow["gcm_color"],
@@ -123,25 +119,22 @@ import (
 	}
 }
 
-// action_type이 custom(선택상품)일때는 code로 상품정보 가져오고
-// best는 hit가 가장 높은 걸로, product는 new에서 가장 최신으로
+
 
 /*
 * 상품 정보 가져오는 함수
 *
 * @param pushdata  
 */
-func GetProductData(pushdata map[string]string) common.ProductData {
+func GetProductData(pushdata map[string]string) common.PDS {
 	// action_type이 product 일때 op=new로 API 호출해서 상품정보 가져온 다음, best는 hit수가 가장 높은 걸로 가져오기
-	data := common.ProductData{}
+	data := common.PDS{}
 	if pushdata["action_type"] == "best" || pushdata["action_type"] == "product" {
 		data = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], "")
 	} else { // custom일때는 op=product로, 상품 code를 같이 API 호출해서 정보 가져오기
 	    data = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
 	}
-	if data.Result == 0 {
-		helper.Log("error", "pushauto.GetProductData", "상품정보 파일 읽어오기 실패")
-	}
+	
 	return data
 }
 
