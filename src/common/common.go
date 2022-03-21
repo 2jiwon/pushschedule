@@ -122,7 +122,7 @@ func CallByappsApi(method string, url string, key string) (ProductData, error) {
     return responseJson, nil
 }
 
-func GetProductFromByapps(app_id string, action_type string, code string) []PDS {
+func GetProductFromByapps(app_id string, action_type string, code string) PDS {
 	URL := ""
 	if len(code) == 0 {
 		URL = config.Get("PRODUCT_API_" + strings.ToUpper(config.Get("MODE"))) + "/index.php?op=new&app_id=" + app_id
@@ -133,11 +133,11 @@ func GetProductFromByapps(app_id string, action_type string, code string) []PDS 
 	pdata, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
     if err != nil {
 		helper.Log("error", "common.GetProductFromByapps", "BYAPPS API 서버 탐색 실패")
-        return nil
+        return PDS{}
     }
     if pdata.Result == 0 {
 		helper.Log("error", "common.GetProductFromByapps", "상품정보 없음")
-		return nil
+		return PDS{}
 	}
 
 	// action_type이 custom(선택상품)일때는 code로 상품정보 가져오고
@@ -146,25 +146,25 @@ func GetProductFromByapps(app_id string, action_type string, code string) []PDS 
 		best := pdata.Pds[0]
 		for i := 1; i < len(pdata.Pds); i++ {
 			if pdata.Pds[i].Hits > best.Hits {
+				if pdata.Pds[i].State == "N" {
+					continue
+				}
 				best = pdata.Pds[i]
 			}
 		}
-		r:=[]PDS{
-			best,
-		}
-		return r
+		return best
 	} else if action_type == "product" {
 		new := pdata.Pds[0]
 		for i := 1; i < len(pdata.Pds); i++ {
 			if pdata.Pds[i].PdRtime > new.PdRtime {
+				if pdata.Pds[i].State == "N" {
+					continue
+				}
 				new = pdata.Pds[i]
 			}
 		}
-		r:=[]PDS{
-			new,
-		}
-		return r
+		return new
 	} else {
-		return pdata.Pds
+		return pdata.Pds[0]
 	}
 }
