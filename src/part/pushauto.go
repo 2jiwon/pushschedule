@@ -2,9 +2,11 @@ package part
 
 import (
 	"fmt"
+	"math/rand"
 	"pushschedule/src/common"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -71,9 +73,24 @@ import (
 			// 5분 후로 설정한 시간과 일치하는지 체크
 			timely, _ := strconv.Atoi(mrow["timely"])
 			currTime, _ := strconv.Atoi(currentTime)
+
 			if timely != currTime {
 				continue
 			}
+
+			// 상품 정보를 가져와서 만약 result가 0이면 다음으로 패스
+			result := GetProductData(mrow)
+			fmt.Println("상품정보: ", reflect.ValueOf(result))
+
+			if result.Result == 0 {
+				continue
+			}
+			fmt.Println("상품명: ", result.Pds[0].Name)
+			
+
+		    // 메시지에 변수 포함되어있으면 치환
+			// msg := ConvertProductInfo(mrow["msg"], result["name"], result["price"])
+			// ios_msg := ConvertProductInfo(mrow["ios_msg"], result["name"], result["price"])
 
 			// push_msg_data에 데이터 삽입
 			f := map[string]interface{}{
@@ -85,8 +102,8 @@ import (
 				"os":            helper.ConvOS(mrow["os"]),
 				"title":         mrow["title"],
 				"notice_title":  mrow["notice_title"],
-				"msg":           mrow["msg"],
-				"ios_msg":       mrow["ios_msg"],
+				// "msg":           msg,
+				// "ios_msg":       ios_msg,
 				"attach_img":    mrow["attach_img"],
 				"link_url":      mrow["link_url"],
 				"gcm_color":     mrow["gcm_color"],
@@ -104,4 +121,72 @@ import (
 			}
 		}
 	}
+}
+
+// action_type이 custom(선택상품)일때는 code로 상품정보 가져오고
+// best는 hit가 가장 높은 걸로, product는 new에서 가장 최신으로
+
+/*
+* 상품 정보 가져오는 함수
+*
+* @param pushdata  
+*/
+func GetProductData(pushdata map[string]string) common.ProductData {
+	// action_type이 product 일때 op=new로 API 호출해서 상품정보 가져온 다음, best는 hit수가 가장 높은 걸로 가져오기
+	data := common.ProductData{}
+	if pushdata["action_type"] == "best" || pushdata["action_type"] == "product" {
+		data = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], "")
+	} else { // custom일때는 op=product로, 상품 code를 같이 API 호출해서 정보 가져오기
+	    data = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
+	}
+	if data.Result == 0 {
+		helper.Log("error", "pushauto.GetProductData", "상품정보 파일 읽어오기 실패")
+	}
+	return data
+}
+
+/*
+* #name, #price 치환
+*
+* @return string
+*/
+func ConvertProductInfo(msg string, name string, price string) string {
+	if strings.Contains(msg, "#name#") {
+		msg = strings.Replace(msg, "#name#", name, -1)
+	}
+	if strings.Contains(msg, "#price#") {
+		msg = strings.Replace(msg, "#price#", price, -1)
+	}
+	return msg	
+}
+
+/*
+ * 수집할 상품 code 가져오기
+ *
+ * @return string
+*/
+func GetProductCode(data map[string]string) string{
+    product_codes := strings.Split(data["products"], "|")
+	seq, _ := strconv.Atoi(data["custom_seq"])
+    if data["send_type"] == "queue" {		
+        if len(product_codes) > seq + 1 {
+            seq += 1
+        } else {
+            seq = 0
+        }
+		
+        return product_codes[seq]
+    } else if data["send_type"] == "random" {
+        var i int
+        seed := rand.NewSource(time.Now().UnixNano())
+        random := rand.New(seed)
+        for {
+            i = random.Intn(len(product_codes))
+            if i != seq {
+                break;
+            }
+        }
+        return product_codes[i]
+    }
+    return ""
 }
