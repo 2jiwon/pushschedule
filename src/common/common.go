@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"pushschedule/src/config"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
+	"strings"
 )
 
 // 메시지 전송 데이터 삽입하기
@@ -70,4 +72,60 @@ func CallCafe24Api(method string, url string, token string) (map[string]interfac
         return nil, err
     }
     return responseJson, nil
+}
+
+type ProductData struct {
+	Result  int    `json:"result"`
+	Message string `json:"message"`
+	Pds     []struct {
+		AppID      string `json:"app_id"`
+		State      string `json:"state"`
+		Code       int    `json:"code"`
+		Name       string `json:"name"`
+		Price      int    `json:"price"`
+		Thum       string `json:"thum"`
+		Link       string `json:"link"`
+		Linkm      string `json:"linkm"`
+		Hits       int    `json:"hits"`
+		PdUtime    int    `json:"pd_utime"`
+		PdRtime    int    `json:"pd_rtime"`
+		UpdateTime int    `json:"update_time"`
+		Idx        int    `json:"idx"`
+	} `json:"pds"`
+	Request struct {
+		Op    string `json:"op"`
+		AppID string `json:"app_id"`
+	} `json:"request"`
+}
+
+func CallByappsApi(method string, url string, key string) (ProductData, error) {
+	request, err := http.NewRequest(method, url, nil)
+    if err != nil {
+        return ProductData{}, err
+    }
+	request.Header.Add("Authorization", key)
+    client := &http.Client{}
+    response, err := client.Do(request)
+    if err != nil {
+        return ProductData{}, err
+    }
+    defer response.Body.Close()
+
+	responseBody, _ := ioutil.ReadAll(response.Body)
+    var responseJson ProductData
+    err = json.Unmarshal(responseBody, &responseJson)
+    if err != nil {
+        return ProductData{}, err
+    }
+    return responseJson, nil
+}
+
+func GetProductFromByapps(app_id string, action_type string, code string) ProductData {
+	URL := config.Get("PRODUCT_API_" + strings.ToUpper(config.Get("MODE"))) + "/index.php?op=new&app_id=" + app_id
+	res, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
+    if err != nil {
+		helper.Log("error", "common.GetNewProductFromByapps", "BYAPPS API 서버 탐색 실패")
+        return ProductData{}
+    }
+    return res
 }
