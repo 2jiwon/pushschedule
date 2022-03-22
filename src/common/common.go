@@ -40,16 +40,10 @@ func SendJandiMsg(desc string, msg string) {
 		ConnectInfo : cdata,
 	}
 	payloadBytes, err := json.Marshal(data)
-	if err != nil {
-		// handle err
-	}
 	body := bytes.NewReader(payloadBytes)
 
 	URL := config.Get("JANDI_WEBHOOK_URL")
 	req, err := http.NewRequest("POST", URL, body)
-	if err != nil {
-		// handle err
-	}
 	req.Header.Set("Accept", "application/vnd.tosslab.jandi-v2+json")
 	req.Header.Set("Content-Type", "application/json")
 
