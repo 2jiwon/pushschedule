@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -8,16 +9,65 @@ import (
 	"pushschedule/src/config"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
-	"strings"
 )
 
-// 메시지 전송 데이터 삽입하기
+// 메시지 데이터 넣을 테이블
+const TB_push_msg_data = "push_msg_data"
+// 리타겟큐 테이블
+const TB_retarget_queue = "BYAPPS_retarget_queue"
+
+// 잔디 웹훅 전송
+func SendJandiMsg(desc string, msg string) {
+	type ConnectInfo struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		ImageURL    string `json:"imageUrl,omitempty"`
+	}
+	type Payload struct {
+		Body         string        `json:"body"`
+		ConnectInfo  []ConnectInfo `json:"connectInfo"`
+	}
+
+	cdata := []ConnectInfo{
+		{
+			Title : "스케쥴링 푸시",
+			Description : desc,
+			ImageURL : "",
+		},
+	}
+	data := &Payload{
+		Body : msg,
+		ConnectInfo : cdata,
+	}
+	payloadBytes, err := json.Marshal(data)
+	if err != nil {
+		// handle err
+	}
+	body := bytes.NewReader(payloadBytes)
+
+	URL := config.Get("JANDI_WEBHOOK_URL")
+	req, err := http.NewRequest("POST", URL, body)
+	if err != nil {
+		// handle err
+	}
+	req.Header.Set("Accept", "application/vnd.tosslab.jandi-v2+json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		helper.Log("error", "common.SendJandiMsg", "잔디 웹훅 전송 실패")
+	}
+	defer resp.Body.Close()
+}
+
+
+// 개별 메시지 전송 데이터 삽입하기
 func InsertPushMSGSendsData(push_idx int, app_id string) {
 	fmt.Println("insert 시작")
-	push_users_table := helper.GetTable("push_users_", app_id)
-	push_msg_table := helper.GetTable("push_msg_sends_", app_id)
+	tb_push_users := helper.GetTable("push_users_", app_id)
+	tb_push_msg := helper.GetTable("push_msg_sends_", app_id)
 
-	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s'", push_users_table, app_id)
+	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s'", tb_push_users, app_id)
 	mrows, tRecord := mysql.Query("master", sql)
 	if tRecord > 0 {
 		for _, mrow := range mrows {
@@ -30,48 +80,21 @@ func InsertPushMSGSendsData(push_idx int, app_id string) {
 				"push_token": mrow["device_id"],
 				"app_os":     helper.ConvOS(mrow["app_os"]),
 			}
-			res, _ := mysql.Insert("master", push_msg_table, data, false)
+			if (mrow["app_os"] == "total") {
+				data["send_and"] = 1
+				data["send_ios"] = 1
+			} else if (mrow["app_os"] == "android") {
+				data["send_and"] = 1
+			} else {
+				data["send_ios"] = 1
+			}
+
+			res, _ := mysql.Insert("master", tb_push_msg, data, false)
 			if res < 1 {
 				helper.Log("error", "common.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
 			}
 		}
 	}
-}
-
-// cafe24 token 정보 가져오기
-func GetCafe24ApiInfo(app_id string) map[string]string {
-	cafe24Api_table := "BYAPPS_cafe24_api_token"
-	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s'", cafe24Api_table, app_id)
-	mrow, tRecord := mysql.GetRow("master", sql)
-	if tRecord > 0 {
-		return mrow
-	} else {
-		helper.Log("error", "common.GetCafe24ApiInfo", fmt.Sprintf("카페24 API 정보 취득 실패-%s", mrow))
-	}
-	return map[string]string{}
-}
-
-// cafe24 api call
-func CallCafe24Api(method string, url string, token string) (map[string]interface{}, error) {
-	request, err := http.NewRequest(method, url, nil)
-    if err != nil {
-        return nil, err
-    }
-	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
-    client := &http.Client{}
-    response, err := client.Do(request)
-    if err != nil {
-        return nil, err
-    }
-    defer response.Body.Close()
-
-	responseBody, _ := ioutil.ReadAll(response.Body)
-    var responseJson map[string]interface{}
-    err = json.Unmarshal(responseBody, &responseJson)
-    if err != nil {
-        return nil, err
-    }
-    return responseJson, nil
 }
 
 type ProductData struct {
@@ -122,49 +145,46 @@ func CallByappsApi(method string, url string, key string) (ProductData, error) {
     return responseJson, nil
 }
 
-func GetProductFromByapps(app_id string, action_type string, code string) PDS {
+func GetProductFromByapps(app_id string, action_type string, code string) (PDS, bool) {
 	URL := ""
-	if len(code) == 0 {
-		URL = config.Get("PRODUCT_API_" + strings.ToUpper(config.Get("MODE"))) + "/index.php?op=new&app_id=" + app_id
+	if code == "" {
+		URL = config.Get("PRODUCT_API") + "/index.php?op=new&app_id=" + app_id
 	} else {
-		URL = config.Get("PRODUCT_API_" + strings.ToUpper(config.Get("MODE"))) + "/index.php?op=product&app_id=" + app_id + "&code=" + code
+		URL = config.Get("PRODUCT_API") + "/index.php?op=product&app_id=" + app_id + "&code=" + code
 	}
 	
 	pdata, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
     if err != nil {
 		helper.Log("error", "common.GetProductFromByapps", "BYAPPS API 서버 탐색 실패")
-        return PDS{}
+        return PDS{}, false
     }
     if pdata.Result == 0 {
 		helper.Log("error", "common.GetProductFromByapps", "상품정보 없음")
-		return PDS{}
+		return PDS{}, false
 	}
 
 	// action_type이 custom(선택상품)일때는 code로 상품정보 가져오고
 	// best는 hit가 가장 높은 걸로, product는 new에서 가장 최신으로
 	if action_type == "best" {
 		best := pdata.Pds[0]
-		for i := 1; i < len(pdata.Pds); i++ {
-			if pdata.Pds[i].Hits > best.Hits {
-				if pdata.Pds[i].State == "N" {
-					continue
-				}
-				best = pdata.Pds[i]
+		for _, val := range pdata.Pds {
+			if val.Hits > best.Hits && val.State == "Y" {
+				best = val
 			}
 		}
-		return best
+		return best, true
 	} else if action_type == "product" {
 		new := pdata.Pds[0]
-		for i := 1; i < len(pdata.Pds); i++ {
-			if pdata.Pds[i].PdRtime > new.PdRtime {
-				if pdata.Pds[i].State == "N" {
-					continue
-				}
-				new = pdata.Pds[i]
+		for _, val := range pdata.Pds {
+			if val.PdRtime > new.PdRtime && val.State == "Y" {
+				new = val
 			}
 		}
-		return new
+		return new, true
 	} else {
-		return pdata.Pds[0]
+		if len(pdata.Pds) > 0 {
+			return pdata.Pds[0], true
+		}
+		return PDS{}, false
 	}
 }
