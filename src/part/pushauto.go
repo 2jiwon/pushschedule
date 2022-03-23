@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"pushschedule/src/common"
+	"pushschedule/src/config"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
 	"strconv"
@@ -26,19 +27,20 @@ import (
 	// 요일 체크
 	weekDay := int(now.Weekday())
 
-	// hhmm 형식으로 현재 시간 변환 (단, 기준 시간은 5분 후로 설정)
+	// hhmm 형식으로 현재 시간 변환 (기준 시간은 5분)
 	now_timestamp := now.Unix()
-	five_mins_later := now.Add(time.Minute * 5)
-	five_mins_later_timestamp := five_mins_later.Unix()
-	hours, minutes, _ := five_mins_later.Clock()
+	pushauto_time_limit := config.Get("PUSHAUTO_LIMIT")
+	mins, _ := time.ParseDuration(pushauto_time_limit + "m")
+	mins_limit := now.Add(-mins)
+	mins_timestamp := mins_limit.Unix()
+	hours, minutes, _ := mins_limit.Clock()
 	currentTime := fmt.Sprintf("%d%02d", hours, minutes)
 
-	// 메시지 데이터 집어넣을 테이블
-	push_msg_data_table := "push_msg_data"
+	// 자동화푸시 테이블
+	const tb_push_auto_data = "BYAPPS2019_push_auto_data"
 
 	// 자동화푸시 테이블에서 데이터 가져오기
-	push_auto_data_table := "BYAPPS2019_push_auto_data"
-	sql := fmt.Sprintf("SELECT * FROM %s", push_auto_data_table)
+	sql := fmt.Sprintf("SELECT * FROM %s WHERE action_on = 1", tb_push_auto_data)
 	mrows, tRecord := mysql.Query("master", sql)
 	if tRecord > 0 {
 		for _, mrow := range mrows {
@@ -69,24 +71,22 @@ import (
 				continue
 			}
 
-			// 5분 후로 설정한 시간과 일치하는지 체크
+			// 설정한 시간 내의 데이터인지 체크
 			timely, _ := strconv.Atoi(mrow["timely"])
 			currTime, _ := strconv.Atoi(currentTime)
-
 			if timely != currTime {
 				continue
 			}
 
-			// 상품 정보를 가져와서 만약 result가 0이면 다음으로 패스
-			result := GetProductData(mrow)
-			// fmt.Println("상품정보: ", reflect.ValueOf(result))
-			if len(result.Name) == 0 {
+			// 상품 정보를 가져와서 만약 error가 true이면 다음으로 패스
+			pdsInfo, err := GetProductData(mrow)
+			if err == true {
 				continue
 			}
 
 		    // 메시지에 변수 포함되어있으면 치환
-			msg := ConvertProductInfo(mrow["msg"], result.Name, strconv.Itoa(result.Price))
-			ios_msg := ConvertProductInfo(mrow["msg"], result.Name, strconv.Itoa(result.Price))
+			msg := ConvertProductInfo(mrow["msg"], pdsInfo.Name, strconv.Itoa(pdsInfo.Price))
+			ios_msg := ConvertProductInfo(mrow["msg"], pdsInfo.Name, strconv.Itoa(pdsInfo.Price))
 
 			// push_msg_data에 데이터 삽입
 			f := map[string]interface{}{
@@ -105,37 +105,53 @@ import (
 				"gcm_color":     mrow["gcm_color"],
 				"target_option": mrow["target_option"],
 				"fcm":           mrow["fcm"],
-				"schedule_time": strconv.FormatInt(five_mins_later_timestamp, 10),
+				"schedule_time": strconv.FormatInt(mins_timestamp, 10),
 				"reg_time":      strconv.FormatInt(now_timestamp, 10),
 			}
-			res, res_idx := mysql.Insert("master", push_msg_data_table, f, true)
+			if (mrow["app_os"] == "total") {
+				f["send_and"] = 1
+				f["send_ios"] = 1
+			} else if (mrow["app_os"] == "android") {
+				f["send_and"] = 1
+			} else {
+				f["send_ios"] = 1
+			}
+
+			res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
 			if res < 1 {
 				helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
+				common.SendJandiMsg("pushauto.CheckPushAutoData", fmt.Sprintf("%s 메시지 전송 데이터 삽입 실패", mrow["app_id"]))
 			} else {
 				// push_msg_sends_ 에 데이터 삽입
 				go common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
 			}
 		}
+	} else {
+		helper.Log("error", "pushauto.CheckPushAutoData", "수집된 데이터가 없음")
 	}
 }
-
-
 
 /*
 * 상품 정보 가져오는 함수
 *
 * @param pushdata  
+* 
+* @return PDS 구조체, error 발생 여부
 */
-func GetProductData(pushdata map[string]string) common.PDS {
-	// action_type이 product 일때 op=new로 API 호출해서 상품정보 가져온 다음, best는 hit수가 가장 높은 걸로 가져오기
+func GetProductData(pushdata map[string]string) (common.PDS, bool) {
 	data := common.PDS{}
+	err := false
 	if pushdata["action_type"] == "best" || pushdata["action_type"] == "product" {
-		data = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], "")
+		data, err = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], "")
 	} else { // custom일때는 op=product로, 상품 code를 같이 API 호출해서 정보 가져오기
-	    data = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
+	    data, err = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
+	}
+
+	if err == true {
+		helper.Log("error", "pushauto.GetProductData", fmt.Sprintf("상품정보 가져오기 실패-%s", pushdata))
 	}
 	
-	return data
+	return data, err
 }
 
 /*
@@ -154,9 +170,9 @@ func ConvertProductInfo(msg string, name string, price string) string {
 }
 
 /*
- * 수집할 상품 code 가져오기
- *
- * @return string
+* 수집할 상품 code 가져오기
+*
+* @return string
 */
 func GetProductCode(data map[string]string) string{
     product_codes := strings.Split(data["products"], "|")

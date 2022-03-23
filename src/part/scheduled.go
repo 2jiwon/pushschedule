@@ -3,6 +3,7 @@ package part
 import (
 	"fmt"
 	"pushschedule/src/common"
+	"pushschedule/src/config"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
 	"strconv"
@@ -16,6 +17,7 @@ import (
  func CheckScheduledPushData() {
 	fmt.Println("체크 시작")
 	// KST로 timezone 설정
+
 	now := time.Now()
 	now = now.In(time.FixedZone("KST", 9*60*60))
 
@@ -25,19 +27,20 @@ import (
 	// 요일 체크
 	weekDay := int(now.Weekday())
 
-	// hhmm 형식으로 현재 시간 변환 (단, 기준 시간은 5분 후로 설정)
+	// hhmm 형식으로 현재 시간 변환 (기준 시간은 5분)
 	now_timestamp := now.Unix()
-	five_mins_later := now.Add(time.Minute * 5)
-	five_mins_later_timestamp := five_mins_later.Unix()
-	hours, minutes, _ := five_mins_later.Clock()
+	schedule_time_limit := config.Get("SCHEDULING_LIMIT")
+	mins, _ := time.ParseDuration(schedule_time_limit + "m")
+	mins_limit := now.Add(-mins)
+	mins_timestamp := mins_limit.Unix()
+	hours, minutes, _ := mins_limit.Clock()
 	currentTime := fmt.Sprintf("%d%02d", hours, minutes)
 
-	// 메시지 데이터 집어넣을 테이블
-	push_msg_data_table := "push_msg_data"
+	// 스케쥴링 테이블
+	const tb_push_schedule_data = "BYAPPS2015_push_schedule_data"
 
 	// 스케쥴 테이블에서 데이터 가져오기
-	push_schedule_data_table := "BYAPPS2015_push_schedule_data"
-	sql := fmt.Sprintf("SELECT * FROM %s", push_schedule_data_table)
+	sql := fmt.Sprintf("SELECT * FROM %s", tb_push_schedule_data)
 	mrows, tRecord := mysql.Query("master", sql)
 	if tRecord > 0 {
 		for _, mrow := range mrows {
@@ -92,16 +95,28 @@ import (
 				"gcm_color":     mrow["gcm_color"],
 				"target_option": mrow["target_option"],
 				"fcm":           mrow["fcm"],
-				"schedule_time": strconv.FormatInt(five_mins_later_timestamp, 10),
+				"schedule_time": strconv.FormatInt(mins_timestamp, 10),
 				"reg_time":      strconv.FormatInt(now_timestamp, 10),
 			}
-			res, res_idx := mysql.Insert("master", push_msg_data_table, f, true)
+			if (mrow["app_os"] == "total") {
+				f["send_and"] = 1
+				f["send_ios"] = 1
+			} else if (mrow["app_os"] == "android") {
+				f["send_and"] = 1
+			} else {
+				f["send_ios"] = 1
+			}
+
+			res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
 			if res < 1 {
 				helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
+				common.SendJandiMsg("scheduled.CheckScheduledPushData", fmt.Sprintf("%s 메시지 전송 데이터 삽입 실패", mrow["app_id"]))
 			} else {
 				// push_msg_sends_ 에 데이터 삽입
 				go common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
 			}
 		}
+	} else {
+		helper.Log("error", "scheduled.CheckScheduledPushData", "수집된 데이터 없음")
 	}
 }
