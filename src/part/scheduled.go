@@ -16,6 +16,7 @@ import (
  func CheckScheduledPushData() {
 	fmt.Println("체크 시작")
 	// KST로 timezone 설정
+
 	now := time.Now()
 	now = now.In(time.FixedZone("KST", 9*60*60))
 
@@ -32,8 +33,10 @@ import (
 	hours, minutes, _ := five_mins_later.Clock()
 	currentTime := fmt.Sprintf("%d%02d", hours, minutes)
 
+	// 스케쥴링 테이블
+	const tb_push_schedule_data = "BYAPPS2015_push_schedule_data"
+
 	// 스케쥴 테이블에서 데이터 가져오기
-	tb_push_schedule_data := "BYAPPS2015_push_schedule_data"
 	sql := fmt.Sprintf("SELECT * FROM %s", tb_push_schedule_data)
 	mrows, tRecord := mysql.Query("master", sql)
 	if tRecord > 0 {
@@ -100,7 +103,7 @@ import (
 			} else {
 				f["send_ios"] = 1
 			}
-			
+
 			res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
 			if res < 1 {
 				helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
@@ -109,5 +112,7 @@ import (
 				go common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
 			}
 		}
+	} else {
+		helper.Log("error", "scheduled.CheckScheduledPushData", "수집된 데이터 없음")
 	}
 }
