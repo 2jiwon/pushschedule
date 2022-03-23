@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// 리타겟큐 테이블
+const tb_retarget_queue = "BYAPPS_retarget_queue"
+
 /*
  * 리타겟 큐 푸쉬 데이터 체크
  */
@@ -32,7 +35,7 @@ import (
 	fmt.Println(formatted_min)
 
 	// 리타겟큐 테이블에서 state가 R이고, 스케쥴타임이 제한시간 ~ 현재 사이인 데이터만 가져오기
-	sql := fmt.Sprintf("SELECT * FROM %s WHERE schedule_time >= %v AND schedule_time <= %v AND state='%s'", common.TB_retarget_queue, formatted_min, formatted_now, "R")
+	sql := fmt.Sprintf("SELECT * FROM %s WHERE schedule_time >= %v AND schedule_time <= %v AND state='%s'", tb_retarget_queue, formatted_min, formatted_now, "R")
 	mrows, tRecord := mysql.Query("ma", sql)
 	if tRecord > 0 {
 		for _, mrow := range mrows {
@@ -84,7 +87,7 @@ import (
 				d := map[string]interface{}{
 					"state" : "N",
 				}
-				update_queue := mysql.Update("ma", common.TB_retarget_queue, d, "idx='" + mrow["idx"] + "'")
+				update_queue := mysql.Update("ma", tb_retarget_queue, d, "idx='" + mrow["idx"] + "'")
 				if update_queue < 1 {
 					helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > state 업데이트 실패")
 				}
@@ -96,7 +99,7 @@ import (
 // 대기열에서 데이터 제거
 func DeleteRetargetQueueData(idx int) {
 	fmt.Println("target_idx: ", idx)
-	sql := fmt.Sprintf("DELETE FROM %s WHERE idx = '%d'", common.TB_retarget_queue, idx)
+	sql := fmt.Sprintf("DELETE FROM %s WHERE idx = '%d'", tb_retarget_queue, idx)
 	_, record := mysql.Query("ma", sql)
 	if record != 0 {
 		helper.Log("error", "retarget_queue.DeleteRetargetQueueData", "retarget_queue 대기열 제거 실패")
