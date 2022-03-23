@@ -130,6 +130,7 @@ func InsertOnePushMSGSendsData(push_idx int, app_id string, app_udid string) {
 			res, _ := mysql.Insert("master", tb_push_msg, data, false)
 			if res < 1 {
 				helper.Log("error", "retarget_queue.InsertOnePushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
+				common.SendJandiMsg("retarget_queue.InsertOnePushMSGSendsData", fmt.Sprintf("%s 메시지 전송 데이터 삽입 실패-%d", app_id, push_idx))
 			}
 		}
 	}

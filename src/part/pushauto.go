@@ -120,6 +120,7 @@ import (
 			res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
 			if res < 1 {
 				helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
+				common.SendJandiMsg("pushauto.CheckPushAutoData", fmt.Sprintf("%s 메시지 전송 데이터 삽입 실패", mrow["app_id"]))
 			} else {
 				// push_msg_sends_ 에 데이터 삽입
 				go common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
