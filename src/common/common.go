@@ -74,15 +74,7 @@ func InsertPushMSGSendsData(push_idx int, app_id string) {
 				"push_token": mrow["device_id"],
 				"app_os":     helper.ConvOS(mrow["app_os"]),
 			}
-			if (mrow["app_os"] == "total") {
-				data["send_and"] = 1
-				data["send_ios"] = 1
-			} else if (mrow["app_os"] == "android") {
-				data["send_and"] = 1
-			} else {
-				data["send_ios"] = 1
-			}
-
+			
 			res, _ := mysql.Insert("master", tb_push_msg, data, false)
 			if res < 1 {
 				helper.Log("error", "common.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
@@ -98,23 +90,24 @@ type ProductData struct {
 	Request struct {
 		Op    string `json:"op"`
 		AppID string `json:"app_id"`
+		Code  string `json:"code"`
 	} `json:"request"`
 }
 
 type PDS struct {
 	AppID      string `json:"app_id"`
 	State      string `json:"state"`
-	Code       int    `json:"code"`
+	Code       int    `json:"code,string,omitempty"`
 	Name       string `json:"name"`
-	Price      int    `json:"price"`
+	Price      int    `json:"price,string,omitempty"`
 	Thum       string `json:"thum"`
 	Link       string `json:"link"`
 	Linkm      string `json:"linkm"`
-	Hits       int    `json:"hits"`
-	PdUtime    int    `json:"pd_utime"`
-	PdRtime    int    `json:"pd_rtime"`
-	UpdateTime int    `json:"update_time"`
-	Idx        int    `json:"idx"`
+	Hits       int    `json:"hits,string,omitempty"`
+	PdUtime    int    `json:"pd_utime,string,omitempty"`
+	PdRtime    int    `json:"pd_rtime,string,omitempty"`
+	UpdateTime int    `json:"update_time,string,omitempty"`
+	Idx        int    `json:"idx,string,omitempty"`
 }
 
 func CallByappsApi(method string, url string, key string) (ProductData, error) {
@@ -139,6 +132,7 @@ func CallByappsApi(method string, url string, key string) (ProductData, error) {
     return responseJson, nil
 }
 
+// @return PDS 타입과 error 발생 여부
 func GetProductFromByapps(app_id string, action_type string, code string) (PDS, bool) {
 	URL := ""
 	if code == "" {
@@ -150,11 +144,12 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 	pdata, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
     if err != nil {
 		helper.Log("error", "common.GetProductFromByapps", "BYAPPS API 서버 탐색 실패")
-        return PDS{}, false
+        return PDS{}, true
     }
+	fmt.Println("pdata: ", pdata)
     if pdata.Result == 0 {
-		helper.Log("error", "common.GetProductFromByapps", "상품정보 없음")
-		return PDS{}, false
+		helper.Log("error", "common.GetProductFromByapps", fmt.Sprintf("상품정보 없음 %s", code))
+		return PDS{}, true
 	}
 
 	// action_type이 custom(선택상품)일때는 code로 상품정보 가져오고
@@ -166,7 +161,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 				best = val
 			}
 		}
-		return best, true
+		return best, false
 	} else if action_type == "product" {
 		new := pdata.Pds[0]
 		for _, val := range pdata.Pds {
@@ -174,11 +169,11 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 				new = val
 			}
 		}
-		return new, true
+		return new, false
 	} else {
 		if len(pdata.Pds) > 0 {
-			return pdata.Pds[0], true
+			return pdata.Pds[0], false
 		}
-		return PDS{}, false
+		return PDS{}, true
 	}
 }
