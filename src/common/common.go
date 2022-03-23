@@ -13,10 +13,10 @@ import (
 
 // 메시지 데이터 넣을 테이블
 const TB_push_msg_data = "push_msg_data"
-// 리타겟큐 테이블
-const TB_retarget_queue = "BYAPPS_retarget_queue"
 
-// 잔디 웹훅 전송
+/*
+* 잔디 웹훅 전송 함수
+*/
 func SendJandiMsg(desc string, msg string) {
 	type ConnectInfo struct {
 		Title       string `json:"title"`
@@ -54,7 +54,6 @@ func SendJandiMsg(desc string, msg string) {
 	defer resp.Body.Close()
 }
 
-
 // 개별 메시지 전송 데이터 삽입하기
 func InsertPushMSGSendsData(push_idx int, app_id string) {
 	fmt.Println("insert 시작")
@@ -83,6 +82,9 @@ func InsertPushMSGSendsData(push_idx int, app_id string) {
 	}
 }
 
+/*
+* 상품정보를 받기 위한 구조체
+*/
 type ProductData struct {
 	Result  int    `json:"result"`
 	Message string `json:"message"`
@@ -110,6 +112,17 @@ type PDS struct {
 	Idx        int    `json:"idx,string,omitempty"`
 }
 
+/*
+* API call 함수
+*
+* @param
+* 	method : GET, POST
+*   url
+*   key
+* 
+* @return 
+* 	PDS 구조체, error 발생 여부
+*/
 func CallByappsApi(method string, url string, key string) (ProductData, error) {
 	request, err := http.NewRequest(method, url, nil)
     if err != nil {
@@ -132,7 +145,17 @@ func CallByappsApi(method string, url string, key string) (ProductData, error) {
     return responseJson, nil
 }
 
-// @return PDS 타입과 error 발생 여부
+/*
+* API 통해서 상품 정보 가져오는 함수
+*
+* @param
+*	app_id
+* 	action_type : best, product, custom
+*	code : 상품 코드
+* 
+* @return 
+*	PDS 구조체, error 발생 여부
+*/
 func GetProductFromByapps(app_id string, action_type string, code string) (PDS, bool) {
 	URL := ""
 	if code == "" {
@@ -152,8 +175,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 		return PDS{}, true
 	}
 
-	// action_type이 custom(선택상품)일때는 code로 상품정보 가져오고
-	// best는 hit가 가장 높은 걸로, product는 new에서 가장 최신으로
+	// best는 hit가 가장 높은 걸로
 	if action_type == "best" {
 		best := pdata.Pds[0]
 		for _, val := range pdata.Pds {
@@ -162,6 +184,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 			}
 		}
 		return best, false
+	// product는 new에서 가장 최신으로
 	} else if action_type == "product" {
 		new := pdata.Pds[0]
 		for _, val := range pdata.Pds {
@@ -170,6 +193,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 			}
 		}
 		return new, false
+	// custom(선택상품)일때는 code로 지정된 상품 정보
 	} else {
 		if len(pdata.Pds) > 0 {
 			return pdata.Pds[0], false
