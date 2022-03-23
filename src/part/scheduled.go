@@ -32,12 +32,9 @@ import (
 	hours, minutes, _ := five_mins_later.Clock()
 	currentTime := fmt.Sprintf("%d%02d", hours, minutes)
 
-	// 메시지 데이터 집어넣을 테이블
-	push_msg_data_table := "push_msg_data"
-
 	// 스케쥴 테이블에서 데이터 가져오기
-	push_schedule_data_table := "BYAPPS2015_push_schedule_data"
-	sql := fmt.Sprintf("SELECT * FROM %s", push_schedule_data_table)
+	tb_push_schedule_data := "BYAPPS2015_push_schedule_data"
+	sql := fmt.Sprintf("SELECT * FROM %s", tb_push_schedule_data)
 	mrows, tRecord := mysql.Query("master", sql)
 	if tRecord > 0 {
 		for _, mrow := range mrows {
@@ -95,7 +92,16 @@ import (
 				"schedule_time": strconv.FormatInt(five_mins_later_timestamp, 10),
 				"reg_time":      strconv.FormatInt(now_timestamp, 10),
 			}
-			res, res_idx := mysql.Insert("master", push_msg_data_table, f, true)
+			if (mrow["app_os"] == "total") {
+				f["send_and"] = 1
+				f["send_ios"] = 1
+			} else if (mrow["app_os"] == "android") {
+				f["send_and"] = 1
+			} else {
+				f["send_ios"] = 1
+			}
+			
+			res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
 			if res < 1 {
 				helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
 			} else {
