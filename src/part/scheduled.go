@@ -3,6 +3,7 @@ package part
 import (
 	"fmt"
 	"pushschedule/src/common"
+	"pushschedule/src/config"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
 	"strconv"
@@ -26,11 +27,13 @@ import (
 	// 요일 체크
 	weekDay := int(now.Weekday())
 
-	// hhmm 형식으로 현재 시간 변환 (단, 기준 시간은 5분 후로 설정)
+	// hhmm 형식으로 현재 시간 변환 (기준 시간은 5분)
 	now_timestamp := now.Unix()
-	five_mins_later := now.Add(time.Minute * 5)
-	five_mins_later_timestamp := five_mins_later.Unix()
-	hours, minutes, _ := five_mins_later.Clock()
+	schedule_time_limit := config.Get("SCHEDULING_LIMIT")
+	mins, _ := time.ParseDuration(schedule_time_limit + "m")
+	mins_limit := now.Add(-mins)
+	mins_timestamp := mins_limit.Unix()
+	hours, minutes, _ := mins_limit.Clock()
 	currentTime := fmt.Sprintf("%d%02d", hours, minutes)
 
 	// 스케쥴링 테이블
@@ -92,7 +95,7 @@ import (
 				"gcm_color":     mrow["gcm_color"],
 				"target_option": mrow["target_option"],
 				"fcm":           mrow["fcm"],
-				"schedule_time": strconv.FormatInt(five_mins_later_timestamp, 10),
+				"schedule_time": strconv.FormatInt(mins_timestamp, 10),
 				"reg_time":      strconv.FormatInt(now_timestamp, 10),
 			}
 			if (mrow["app_os"] == "total") {
