@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	defer func () {
+	defer func() {
 		if v := recover(); v != nil {
 			helper.Log("ERROR", "MAIN ERROR", "")
 			common.SendJandiMsg("스케쥴링 푸시 > 메인 에러 발생", "스케쥴링 푸시 > 메인 에러 발생")
@@ -18,8 +18,8 @@ func main() {
 	}()
 	scheduling_dtime, _ := strconv.Atoi(config.Get("SCHEDULING_CHECK_DELAY"))
 	for {
-		//go part.CheckScheduledPushData()
-		//go part.CheckRetargetQueueData()
+		go part.CheckScheduledPushData()
+		go part.CheckRetargetQueueData()
 		go part.CheckPushAutoData()
 		time.Sleep(time.Minute * time.Duration(scheduling_dtime))
 	}
