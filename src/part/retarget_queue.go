@@ -75,17 +75,25 @@ const tb_retarget_queue = "BYAPPS_retarget_queue"
 					"reg_time":      now_timestamp,
 				}
 				
-				res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
-				if res < 1 {
+				insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
+				if insert_res < 1 {
 					helper.Log("error", "retarget_queue.CheckRetargetQueueData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
 				} else {
 					// push_msg_sends_ 에 데이터 삽입
-					go InsertOnePushMSGSendsData(res_idx, mrow["app_id"], mrow["app_udid"])
-
+					result := InsertOnePushMSGSendsData(res_idx, mrow["app_id"], mrow["app_udid"])
+					if result == true {
+						// push_msg_data에 state 업데이트
+						d := map[string]interface{}{
+							"state" : "R",
+						}
+						update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='" + strconv.Itoa(res_idx) + "'")
+						if update_res < 1 {
+							helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > state 업데이트 실패")
+						}
+					}
 					// 대기열에서 데이터 제거
 					DeleteRetargetQueueData(target_idx)
-				}
-				
+				}				
 			} else {
 				helper.Log("error", "retarget_queue.CheckRetargetQueueData", "상품 정보 취득 실패, 발송 실패 처리")
 				// 상품정보를 못 가져왔으면 처리결과를 실패로 업데이트
@@ -112,8 +120,12 @@ func DeleteRetargetQueueData(idx int) {
 	}
 }
 
-// 단일 메시지 전송 데이터 삽입하기
-func InsertOnePushMSGSendsData(push_idx int, app_id string, app_udid string) {
+/*
+* 단일 메시지 전송 데이터 삽입하기
+*
+* @return 실행 결과 true, false
+*/
+func InsertOnePushMSGSendsData(push_idx int, app_id string, app_udid string) bool {
 	//fmt.Println("insert 시작")
 	tb_push_users := helper.GetTable("push_users_", app_id)
 	tb_push_msg := helper.GetTable("push_msg_sends_", app_id)
@@ -137,7 +149,10 @@ func InsertOnePushMSGSendsData(push_idx int, app_id string, app_udid string) {
 			if res < 1 {
 				helper.Log("error", "retarget_queue.InsertOnePushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
 				common.SendJandiMsg("retarget_queue.InsertOnePushMSGSendsData", fmt.Sprintf("%s 메시지 전송 데이터 삽입 실패-%d", app_id, push_idx))
+
+				return false
 			}
 		}
 	}
+	return true
 }

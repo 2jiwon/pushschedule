@@ -16,6 +16,12 @@ import (
  * 자동화 푸시 데이터 체크
  */
  func CheckPushAutoData() {
+	defer func () {
+		if v := recover(); v != nil {
+			helper.Log("Error", "CheckPushAutoData Error", "")
+			common.SendJandiMsg("스케쥴링 푸시 > 자동화푸시 실행 에러", "스케쥴링 푸시 > 자동화푸시 실행 에러 발생")
+		}
+	}()
 	fmt.Println("자동화푸시 체크 시작")
 	// KST로 timezone 설정
 	now := time.Now()

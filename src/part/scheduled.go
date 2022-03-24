@@ -15,6 +15,12 @@ import (
  * 스케쥴링 푸쉬 데이터 체크
  */
  func CheckScheduledPushData() {
+	defer func () {
+		if v := recover(); v != nil {
+			helper.Log("Error", "CheckScheduledPushData Error", "")
+			common.SendJandiMsg("스케쥴링 푸시 > 스케쥴링 푸시 실행 에러", "스케쥴링 푸시 > 스케쥴링 푸시 실행 에러 발생")
+		}
+	}()
 	fmt.Println("체크 시작")
 	
 	now := time.Now()
