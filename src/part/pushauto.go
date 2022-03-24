@@ -16,10 +16,19 @@ import (
  * 자동화 푸시 데이터 체크
  */
  func CheckPushAutoData() {
+	defer func () {
+		if v := recover(); v != nil {
+			helper.Log("Error", "CheckPushAutoData Error", "")
+			common.SendJandiMsg("스케쥴링 푸시 > 자동화푸시 실행 에러", "스케쥴링 푸시 > 자동화푸시 실행 에러 발생")
+		}
+	}()
 	fmt.Println("자동화푸시 체크 시작")
 	// KST로 timezone 설정
 	now := time.Now()
+	// time parse를 위한 location 지정
+	loc, _ := time.LoadLocation("Asia/Seoul")
 	now = now.In(time.FixedZone("KST", 9*60*60))
+	formatted_now := now.Format("1504")
 
 	// 현재 홀수 주 인지 짝수 주인지 체크
 	_, week := now.ISOWeek()
@@ -28,13 +37,10 @@ import (
 	weekDay := int(now.Weekday())
 
 	// hhmm 형식으로 현재 시간 변환 (기준 시간은 5분)
-	now_timestamp := now.Unix()
 	pushauto_time_limit := config.Get("PUSHAUTO_LIMIT")
 	mins, _ := time.ParseDuration(pushauto_time_limit + "m")
 	mins_limit := now.Add(-mins)
-	mins_timestamp := mins_limit.Unix()
-	hours, minutes, _ := mins_limit.Clock()
-	currentTime := fmt.Sprintf("%d%02d", hours, minutes)
+	formatted_mins := mins_limit.Format("1504")
 
 	// 자동화푸시 테이블
 	const tb_push_auto_data = "BYAPPS2019_push_auto_data"
@@ -71,16 +77,14 @@ import (
 				continue
 			}
 
-			// 설정한 시간 내의 데이터인지 체크
-			timely, _ := strconv.Atoi(mrow["timely"])
-			currTime, _ := strconv.Atoi(currentTime)
-			if timely != currTime {
+			// 제한 시간 내의 데이터인지 체크
+			if mrow["timely"] < formatted_mins || mrow["timely"] > formatted_now {
 				continue
 			}
 
-			// 상품 정보를 가져와서 만약 error가 true이면 다음으로 패스
-			pdsInfo, err := GetProductData(mrow)
-			if err == true {
+			// 상품 정보를 가져와서 만약 상품정보가가 없으면 다음으로 패스
+			pdsInfo, chk := GetProductData(mrow)
+			if chk == false {
 				continue
 			}
 
@@ -88,8 +92,13 @@ import (
 			msg := ConvertProductInfo(mrow["msg"], pdsInfo.Name, strconv.Itoa(pdsInfo.Price))
 			ios_msg := ConvertProductInfo(mrow["msg"], pdsInfo.Name, strconv.Itoa(pdsInfo.Price))
 
+			// 스케쥴타임 넣기 위한 포맷변경
+			schedule_time_data := fmt.Sprintf("%s%s", now.Format("20060102"), mrow["timely"])
+			schedule_time, _ := time.ParseInLocation("200601021504", schedule_time_data, loc)
+
 			// push_msg_data에 데이터 삽입
 			f := map[string]interface{}{
+				"state":         "A",
 				"app_id":        mrow["app_id"],
 				"push_type":     "auto",
 				"msg_type":      mrow["msg_type"],
@@ -105,29 +114,35 @@ import (
 				"gcm_color":     mrow["gcm_color"],
 				"target_option": mrow["target_option"],
 				"fcm":           mrow["fcm"],
-				"schedule_time": strconv.FormatInt(mins_timestamp, 10),
-				"reg_time":      strconv.FormatInt(now_timestamp, 10),
-			}
-			if (mrow["app_os"] == "total") {
-				f["send_and"] = 1
-				f["send_ios"] = 1
-			} else if (mrow["app_os"] == "android") {
-				f["send_and"] = 1
-			} else {
-				f["send_ios"] = 1
+				"schedule_time": schedule_time.Unix(),
+				"reg_time": 	 now.Unix(),
 			}
 
-			res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
-			if res < 1 {
-				helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
-				common.SendJandiMsg("pushauto.CheckPushAutoData", fmt.Sprintf("%s 메시지 전송 데이터 삽입 실패", mrow["app_id"]))
+			insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
+			if insert_res < 1 {
+				helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow))
+				common.SendJandiMsg("pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow["app_id"]))
 			} else {
 				// push_msg_sends_ 에 데이터 삽입
-				go common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
+				total_cnt, and_cnt, ios_cnt := common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
+				if total_cnt == 0 {
+					helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_sends_%s Insert된 내역이 없음", mrow["app_id"]))
+				} else {
+					// push_msg_data에 state와 발송수 업데이트
+					d := map[string]interface{} {
+						"state": 	"R",
+						"send_and": and_cnt,
+						"send_ios": ios_cnt,
+					}
+					update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='" + strconv.Itoa(res_idx) + "'")
+					if update_res < 1 {
+						helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_data Update 실패- idx : %d", res_idx))
+					}
+				}
 			}
 		}
 	} else {
-		helper.Log("error", "pushauto.CheckPushAutoData", "수집된 데이터가 없음")
+		helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("%s에서 수집된 데이터가 없음", tb_push_auto_data))
 	}
 }
 
@@ -136,22 +151,24 @@ import (
 *
 * @param pushdata  
 * 
-* @return PDS 구조체, error 발생 여부
+* @return PDS 구조체, 상품존재여부
 */
 func GetProductData(pushdata map[string]string) (common.PDS, bool) {
 	data := common.PDS{}
-	err := false
+	chk := false
 	if pushdata["action_type"] == "best" || pushdata["action_type"] == "product" {
-		data, err = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], "")
+		data, chk = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], "")
 	} else { // custom일때는 op=product로, 상품 code를 같이 API 호출해서 정보 가져오기
-	    data, err = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
+	    data, chk = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
 	}
 
-	if err == true {
+	fmt.Println(chk)
+
+	if chk == false {
 		helper.Log("error", "pushauto.GetProductData", fmt.Sprintf("상품정보 가져오기 실패-%s", pushdata))
 	}
 	
-	return data, err
+	return data, chk
 }
 
 /*
