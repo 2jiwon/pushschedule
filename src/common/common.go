@@ -9,6 +9,7 @@ import (
 	"pushschedule/src/config"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
+	"time"
 )
 
 // 메시지 데이터 넣을 테이블
@@ -54,11 +55,19 @@ func SendJandiMsg(desc string, msg string) {
 	defer resp.Body.Close()
 }
 
-// 개별 메시지 전송 데이터 삽입하기
-func InsertPushMSGSendsData(push_idx int, app_id string) {
-	fmt.Println("insert 시작")
+/*
+* 개별 메시지 전송 데이터 삽입하기
+*
+* @return OS 갯수
+*	 total, android, ios
+*/
+func InsertPushMSGSendsData(push_idx int, app_id string) (int, int, int) {
+	//fmt.Println("insert 시작")
 	tb_push_users := helper.GetTable("push_users_", app_id)
 	tb_push_msg := helper.GetTable("push_msg_sends_", app_id)
+
+	and_cnt := 0
+	ios_cnt := 0
 
 	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s'", tb_push_users, app_id)
 	mrows, tRecord := mysql.Query("master", sql)
@@ -72,15 +81,23 @@ func InsertPushMSGSendsData(push_idx int, app_id string) {
 				"shop_no":    mrow["app_shop_no"],
 				"push_token": mrow["device_id"],
 				"app_os":     helper.ConvOS(mrow["app_os"]),
-			}
-			
+				"reg_time":   time.Now().Unix(),
+			}			
 			res, _ := mysql.Insert("master", tb_push_msg, data, false)
 			if res < 1 {
 				helper.Log("error", "common.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
 				SendJandiMsg("common.InsertPushMSGSendsData", fmt.Sprintf("%s 메시지 전송 데이터 삽입 실패 - %d", app_id, push_idx))
 			}
+
+			if mrow["app_os"] == "android" {
+				and_cnt++
+			} else {
+				ios_cnt++
+			}
 		}
 	}
+
+	return and_cnt + ios_cnt, and_cnt, ios_cnt
 }
 
 /*
@@ -155,7 +172,7 @@ func CallByappsApi(method string, url string, key string) (ProductData, error) {
 *	code : 상품 코드
 * 
 * @return 
-*	PDS 구조체, error 발생 여부
+*	PDS 구조체, 상품 존재 여부
 */
 func GetProductFromByapps(app_id string, action_type string, code string) (PDS, bool) {
 	URL := ""
@@ -168,37 +185,39 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 	pdata, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
     if err != nil {
 		helper.Log("error", "common.GetProductFromByapps", "BYAPPS API 서버 탐색 실패")
-        return PDS{}, true
+        return PDS{}, false
     }
-	fmt.Println("pdata: ", pdata)
+
     if pdata.Result == 0 {
 		helper.Log("error", "common.GetProductFromByapps", fmt.Sprintf("상품정보 없음 %s", code))
-		return PDS{}, true
+		return PDS{}, false
 	}
 
 	// best는 hit가 가장 높은 걸로
 	if action_type == "best" {
-		best := pdata.Pds[0]
+		best := PDS{}
 		for _, val := range pdata.Pds {
 			if val.Hits > best.Hits && val.State == "Y" {
 				best = val
 			}
 		}
-		return best, false
+		return best, true
 	// product는 new에서 가장 최신으로
 	} else if action_type == "product" {
-		new := pdata.Pds[0]
+		new := PDS{}
 		for _, val := range pdata.Pds {
 			if val.PdRtime > new.PdRtime && val.State == "Y" {
 				new = val
 			}
 		}
-		return new, false
+		return new, true
 	// custom(선택상품)일때는 code로 지정된 상품 정보
 	} else {
 		if len(pdata.Pds) > 0 {
-			return pdata.Pds[0], false
+			if pdata.Pds[0].State == "Y" {
+				return pdata.Pds[0], true
+			}
 		}
-		return PDS{}, true
+		return PDS{}, false
 	}
 }
