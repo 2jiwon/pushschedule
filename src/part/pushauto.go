@@ -15,8 +15,8 @@ import (
 /*
  * 자동화 푸시 데이터 체크
  */
- func CheckPushAutoData() {
-	defer func () {
+func CheckPushAutoData() {
+	defer func() {
 		if v := recover(); v != nil {
 			helper.Log("Error", "CheckPushAutoData Error", "")
 			common.SendJandiMsg("스케쥴링 푸시 > 자동화푸시 실행 에러", "스케쥴링 푸시 > 자동화푸시 실행 에러 발생")
@@ -88,7 +88,7 @@ import (
 				continue
 			}
 
-		    // 메시지에 변수 포함되어있으면 치환
+			// 메시지에 변수 포함되어있으면 치환
 			msg := ConvertProductInfo(mrow["msg"], pdsInfo.Name, strconv.Itoa(pdsInfo.Price))
 			ios_msg := ConvertProductInfo(mrow["msg"], pdsInfo.Name, strconv.Itoa(pdsInfo.Price))
 
@@ -115,7 +115,7 @@ import (
 				"target_option": mrow["target_option"],
 				"fcm":           mrow["fcm"],
 				"schedule_time": schedule_time.Unix(),
-				"reg_time": 	 now.Unix(),
+				"reg_time":      now.Unix(),
 			}
 
 			insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
@@ -129,12 +129,12 @@ import (
 					helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_sends_%s Insert된 내역이 없음", mrow["app_id"]))
 				} else {
 					// push_msg_data에 state와 발송수 업데이트
-					d := map[string]interface{} {
-						"state": 	"R",
+					d := map[string]interface{}{
+						"state":    "R",
 						"send_and": and_cnt,
 						"send_ios": ios_cnt,
 					}
-					update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='" + strconv.Itoa(res_idx) + "'")
+					update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='"+strconv.Itoa(res_idx)+"'")
 					if update_res < 1 {
 						helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_data Update 실패- idx : %d", res_idx))
 					}
@@ -149,17 +149,17 @@ import (
 /*
 * 상품 정보 가져오는 함수
 *
-* @param pushdata  
-* 
+* @param pushdata
+*
 * @return PDS 구조체, 상품존재여부
-*/
+ */
 func GetProductData(pushdata map[string]string) (common.PDS, bool) {
 	data := common.PDS{}
 	chk := false
 	if pushdata["action_type"] == "best" || pushdata["action_type"] == "product" {
 		data, chk = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], "")
 	} else { // custom일때는 op=product로, 상품 code를 같이 API 호출해서 정보 가져오기
-	    data, chk = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
+		data, chk = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
 	}
 
 	fmt.Println(chk)
@@ -167,7 +167,7 @@ func GetProductData(pushdata map[string]string) (common.PDS, bool) {
 	if chk == false {
 		helper.Log("error", "pushauto.GetProductData", fmt.Sprintf("상품정보 가져오기 실패-%s", pushdata))
 	}
-	
+
 	return data, chk
 }
 
@@ -175,7 +175,7 @@ func GetProductData(pushdata map[string]string) (common.PDS, bool) {
 * #name, #price 치환
 *
 * @return string
-*/
+ */
 func ConvertProductInfo(msg string, name string, price string) string {
 	if strings.Contains(msg, "#name#") {
 		msg = strings.Replace(msg, "#name#", name, -1)
@@ -183,36 +183,36 @@ func ConvertProductInfo(msg string, name string, price string) string {
 	if strings.Contains(msg, "#price#") {
 		msg = strings.Replace(msg, "#price#", price, -1)
 	}
-	return msg	
+	return msg
 }
 
 /*
 * 수집할 상품 code 가져오기
 *
 * @return string
-*/
-func GetProductCode(data map[string]string) string{
-    product_codes := strings.Split(data["products"], "|")
+ */
+func GetProductCode(data map[string]string) string {
+	product_codes := strings.Split(data["products"], "|")
 	seq, _ := strconv.Atoi(data["custom_seq"])
-    if data["send_type"] == "queue" {		
-        if len(product_codes) > seq + 1 {
-            seq += 1
-        } else {
-            seq = 0
-        }
-		
-        return product_codes[seq]
-    } else if data["send_type"] == "random" {
-        var i int
-        seed := rand.NewSource(time.Now().UnixNano())
-        random := rand.New(seed)
-        for {
-            i = random.Intn(len(product_codes))
-            if i != seq {
-                break;
-            }
-        }
-        return product_codes[i]
-    }
-    return ""
+	if data["send_type"] == "queue" {
+		if len(product_codes) > seq+1 {
+			seq += 1
+		} else {
+			seq = 0
+		}
+
+		return product_codes[seq]
+	} else if data["send_type"] == "random" {
+		var i int
+		seed := rand.NewSource(time.Now().UnixNano())
+		random := rand.New(seed)
+		for {
+			i = random.Intn(len(product_codes))
+			if i != seq {
+				break
+			}
+		}
+		return product_codes[i]
+	}
+	return ""
 }

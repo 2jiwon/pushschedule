@@ -16,8 +16,8 @@ const tb_retarget_queue = "BYAPPS_retarget_queue"
 /*
  * 리타겟 큐 푸쉬 데이터 체크
  */
- func CheckRetargetQueueData() {
-	defer func () {
+func CheckRetargetQueueData() {
+	defer func() {
 		if v := recover(); v != nil {
 			helper.Log("Error", "CheckRetargetQueueData Error", "")
 			common.SendJandiMsg("스케쥴링 푸시 > 리타겟큐 실행 에러", "스케쥴링 푸시 > 리타겟큐 실행 에러 발생")
@@ -40,24 +40,26 @@ const tb_retarget_queue = "BYAPPS_retarget_queue"
 	formatted_min := time_limit.Format("200601021504")
 
 	// 리타겟큐 테이블에서 state가 R이고, 스케쥴타임이 제한시간 ~ 현재 사이인 데이터만 가져오기
-	sql := fmt.Sprintf("SELECT * FROM %s WHERE schedule_time >= %v AND schedule_time <= %v AND state='%s'", tb_retarget_queue, formatted_min, formatted_now, "R")
+	sql := fmt.Sprintf("SELECT * FROM %s WHERE schedule_time >= %v AND app_os='ios' AND schedule_time <= %v AND state='%s'", tb_retarget_queue, formatted_min, formatted_now, "R")
 	mrows, tRecord := mysql.Query("ma", sql)
 	if tRecord > 0 {
 		for _, mrow := range mrows {
 			// idx 정보 먼저 저장
 			target_idx, _ := strconv.Atoi(mrow["idx"])
-			
+
 			// 상품정보 가져오기
 			_, chk := common.GetProductFromByapps(mrow["app_id"], "custom", mrow["product_code"])
-			
+
 			// 스케쥴 타임을 넣기 위한 포맷 변환
 			timeD := mrow["schedule_time"]
 			schedule_time, _ := time.ParseInLocation("200601021504", timeD, loc)
 
 			if chk == true {
+				// 리타켓 데이터 가져오기
+
 				// push_msg_data에 데이터 삽입
 				f := map[string]interface{}{
-					"state":  		"A",
+					"state":         "A",
 					"app_id":        mrow["app_id"],
 					"push_type":     "retarget",
 					"msg_type":      "retarget",
@@ -65,7 +67,7 @@ const tb_retarget_queue = "BYAPPS_retarget_queue"
 					"app_lang":      mrow["lang"],
 					"os":            helper.ConvOS(mrow["app_os"]),
 					"title":         mrow["product_name"],
-					"notice_title":  "↓ 두 손가락으로 당겨주세요 ↓",
+					"notice_title":  "↓ 두 손가락으로 당겨주세요",
 					"msg":           mrow["product_name"],
 					"ios_msg":       mrow["product_name"],
 					"attach_img":    mrow["img_url"],
@@ -74,7 +76,7 @@ const tb_retarget_queue = "BYAPPS_retarget_queue"
 					"schedule_time": schedule_time.Unix(),
 					"reg_time":      now_timestamp,
 				}
-				
+
 				insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
 				if insert_res < 1 {
 					helper.Log("error", "retarget_queue.CheckRetargetQueueData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
@@ -84,26 +86,29 @@ const tb_retarget_queue = "BYAPPS_retarget_queue"
 					if result == true {
 						// push_msg_data에 state 업데이트
 						d := map[string]interface{}{
-							"state" : "R",
+							"state": "R",
 						}
-						update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='" + strconv.Itoa(res_idx) + "'")
+						update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='"+strconv.Itoa(res_idx)+"'")
 						if update_res < 1 {
 							helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > state 업데이트 실패")
 						}
 					}
 					// 대기열에서 데이터 제거
 					DeleteRetargetQueueData(target_idx)
-				}				
+				}
 			} else {
 				helper.Log("error", "retarget_queue.CheckRetargetQueueData", "상품 정보 취득 실패, 발송 실패 처리")
 				// 상품정보를 못 가져왔으면 처리결과를 실패로 업데이트
 				d := map[string]interface{}{
-					"state" : "N",
+					"state": "N",
 				}
-				update_queue := mysql.Update("ma", tb_retarget_queue, d, "idx='" + mrow["idx"] + "'")
+				update_queue := mysql.Update("ma", tb_retarget_queue, d, "idx='"+mrow["idx"]+"'")
 				if update_queue < 1 {
 					helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > state 업데이트 실패")
 				}
+
+				//1차나, 2차인경우 다음 회차가 있느는거를 체크해서 있으면 시간을 현시간부 5초후 발송
+
 			}
 		}
 	}
@@ -124,7 +129,7 @@ func DeleteRetargetQueueData(idx int) {
 * 단일 메시지 전송 데이터 삽입하기
 *
 * @return 실행 결과 true, false
-*/
+ */
 func InsertOnePushMSGSendsData(push_idx int, app_id string, app_udid string) bool {
 	//fmt.Println("insert 시작")
 	tb_push_users := helper.GetTable("push_users_", app_id)
@@ -144,7 +149,7 @@ func InsertOnePushMSGSendsData(push_idx int, app_id string, app_udid string) boo
 				"app_os":     helper.ConvOS(mrow["app_os"]),
 				"reg_time":   time.Now().Unix(),
 			}
-			
+
 			res, _ := mysql.Insert("master", tb_push_msg, data, false)
 			if res < 1 {
 				helper.Log("error", "retarget_queue.InsertOnePushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))

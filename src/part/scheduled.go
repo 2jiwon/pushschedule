@@ -14,15 +14,15 @@ import (
 /*
  * 스케쥴링 푸쉬 데이터 체크
  */
- func CheckScheduledPushData() {
-	defer func () {
+func CheckScheduledPushData() {
+	defer func() {
 		if v := recover(); v != nil {
 			helper.Log("Error", "CheckScheduledPushData Error", "")
 			common.SendJandiMsg("스케쥴링 푸시 > 스케쥴링 푸시 실행 에러", "스케쥴링 푸시 > 스케쥴링 푸시 실행 에러 발생")
 		}
 	}()
 	fmt.Println("체크 시작")
-	
+
 	now := time.Now()
 	// KST로 timezone 설정
 	now = now.In(time.FixedZone("KST", 9*60*60))
@@ -61,13 +61,10 @@ import (
 			}
 
 			daily := strings.Split(mrow["daily"], "|")
-			isContinue := false
+			isContinue := true
 			for _, day := range daily { // 해당 날짜인지 체크
 				if dayValue, err := strconv.Atoi(day); err == nil {
-					if dayValue != weekDay {
-						isContinue = true
-						continue
-					} else {
+					if dayValue == weekDay {
 						isContinue = false
 						break
 					}
@@ -86,47 +83,53 @@ import (
 			schedule_time_data := fmt.Sprintf("%s%s", now.Format("20060102"), mrow["timely"])
 			schedule_time, _ := time.ParseInLocation("200601021504", schedule_time_data, loc)
 
-			// push_msg_data에 데이터 삽입
-			f := map[string]interface{}{
-				"state" :        "A",
-				"app_id":        mrow["app_id"],
-				"push_type":     "schedule",
-				"msg_type":      mrow["msg_type"],
-				"server_group":  mrow["server_group"],
-				"app_lang":      mrow["app_lang"],
-				"os":            helper.ConvOS(mrow["os"]),
-				"title":         mrow["title"],
-				"notice_title":  mrow["notice_title"],
-				"msg":           mrow["msg"],
-				"ios_msg":       mrow["ios_msg"],
-				"attach_img":    mrow["attach_img"],
-				"link_url":      mrow["link_url"],
-				"gcm_color":     mrow["gcm_color"],
-				"target_option": mrow["target_option"],
-				"fcm":           mrow["fcm"],
-				"schedule_time": schedule_time.Unix(),
-				"reg_time": 	 now.Unix(),
-			}
+			//schdule-time으로 이미 발송 여부 체크
+			sql = fmt.Sprintf("select idx from %s where schdule_time='%v' and app_id='%s' and send_group='%s'", common.TB_push_msg_data, schedule_time.Unix(), mrow["app_id"], mrow["idx"])
+			idx, _ = strconv.Atoi(mysql.GetOne("master", sql))
+			if idx == 0 {
 
-			insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
-			if insert_res < 1 {
-				helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow))
-				common.SendJandiMsg("scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow["app_id"]))
-			} else {
-				// push_msg_sends_ 에 데이터 삽입
-				total_cnt, and_cnt, ios_cnt := common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
-				if total_cnt == 0 {
-					helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_sends_%s Insert된 내역이 없음", mrow["app_id"]))
+				// push_msg_data에 데이터 삽입
+				f := map[string]interface{}{
+					"state":         "A",
+					"app_id":        mrow["app_id"],
+					"push_type":     "schedule",
+					"msg_type":      mrow["msg_type"],
+					"send_group":    mrow["idx"],
+					"app_lang":      mrow["app_lang"],
+					"os":            helper.ConvOS(mrow["os"]),
+					"title":         mrow["title"],
+					"notice_title":  mrow["notice_title"],
+					"msg":           mrow["msg"],
+					"ios_msg":       mrow["ios_msg"],
+					"attach_img":    mrow["attach_img"],
+					"link_url":      mrow["link_url"],
+					"gcm_color":     mrow["gcm_color"],
+					"target_option": mrow["target_option"],
+					"fcm":           mrow["fcm"],
+					"schedule_time": schedule_time.Unix(),
+					"reg_time":      now.Unix(),
+				}
+
+				insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
+				if insert_res < 1 {
+					helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow))
+					common.SendJandiMsg("scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow["app_id"]))
 				} else {
-					// push_msg_data에 state와 발송수 업데이트
-					d := map[string]interface{} {
-						"state" : "R",
-						"send_and" : and_cnt,
-						"send_ios" : ios_cnt,
-					}
-					update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='" + strconv.Itoa(res_idx) + "'")
-					if update_res < 1 {
-						helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Update 실패- idx : %d", res_idx))
+					// push_msg_sends_ 에 데이터 삽입
+					total_cnt, and_cnt, ios_cnt := common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
+					if total_cnt == 0 {
+						helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_sends_%s Insert된 내역이 없음", mrow["app_id"]))
+					} else {
+						// push_msg_data에 state와 발송수 업데이트
+						d := map[string]interface{}{
+							"state":    "R",
+							"send_and": and_cnt,
+							"send_ios": ios_cnt,
+						}
+						update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='"+strconv.Itoa(res_idx)+"'")
+						if update_res < 1 {
+							helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Update 실패- idx : %d", res_idx))
+						}
 					}
 				}
 			}
