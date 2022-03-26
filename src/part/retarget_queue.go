@@ -1,6 +1,7 @@
 package part
 
 import (
+	"encoding/json"
 	"fmt"
 	"pushschedule/src/common"
 	"pushschedule/src/config"
@@ -12,6 +13,8 @@ import (
 
 // 리타겟큐 테이블
 const tb_retarget_queue = "BYAPPS_retarget_queue"
+// 리타겟팅 셋팅 정보가 있는 테이블
+const tb_language_menu_data = "BYAPPS2015_language_menu_data"
 
 /*
  * 리타겟 큐 푸쉬 데이터 체크
@@ -39,7 +42,7 @@ func CheckRetargetQueueData() {
 	time_limit := now.Add(-mins)
 	formatted_min := time_limit.Format("200601021504")
 
-	// 리타겟큐 테이블에서 state가 R이고, 스케쥴타임이 제한시간 ~ 현재 사이인 데이터만 가져오기
+	// 리타겟큐 테이블에서 state가 R이고, 스케쥴타임이 제한시간~현재 사이인 데이터만 가져오기
 	sql := fmt.Sprintf("SELECT * FROM %s WHERE schedule_time >= %v AND app_os='ios' AND schedule_time <= %v AND state='%s'", tb_retarget_queue, formatted_min, formatted_now, "R")
 	mrows, tRecord := mysql.Query("ma", sql)
 	if tRecord > 0 {
@@ -55,21 +58,47 @@ func CheckRetargetQueueData() {
 			schedule_time, _ := time.ParseInLocation("200601021504", timeD, loc)
 
 			if chk == true {
-				// 리타켓 데이터 가져오기
+				// user data 가져오기
+				app_shop_id := "고객"
+				sql = fmt.Sprintf("SELECT app_shop_id FROM %s WHERE app_udid='%s' ORDER BY idx DESC", common.GetTable("push_users_", mrow["app_id"]), mrow["app_udid"])
+				srow, sRecord := mysql.GetRow("master", sql)
+				if sRecord > 0 {
+					app_shop_id = srow["app_shop_id"]
+				}
 
+				msg := mrow["product_name"]
+				ios_msg := mrow["product_name"]
+				// language_menu_data에서 리타켓 데이터 가져오기
+				sql = fmt.Sprintf("SELECT menu_content FROM %s WHERE app_id='%s' AND menu_type='9'", tb_language_menu_data, mrow["app_id"])
+				vrow, vRecord := mysql.GetRow("master", sql)
+				if vRecord > 0 {
+					// 가져와서 메시지 변환
+					content := make(map[string]interface{}) 
+					json.Unmarshal([]byte(vrow["menu_content"]), &content)
+					data := map[string]string {
+						"USER" : app_shop_id,
+						"PRODUCT" : mrow["product_name"],
+					}
+					
+					msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["msg" + mrow["send_no"]]), data)
+					ios_msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["ios_msg" + mrow["send_no"]]), data)
+				} else {
+					helper.Log("error", "retarget_queue.CheckRetargetQueueData", "리타겟큐 메시지 셋팅 정보가 없음")
+				}
+	
 				// push_msg_data에 데이터 삽입
 				f := map[string]interface{}{
 					"state":         "A",
 					"app_id":        mrow["app_id"],
 					"push_type":     "retarget",
 					"msg_type":      "retarget",
-					"server_group":  helper.GetRandom(),
+					"send_group":    mrow["idx"],
 					"app_lang":      mrow["lang"],
 					"os":            helper.ConvOS(mrow["app_os"]),
 					"title":         mrow["product_name"],
-					"notice_title":  "↓ 두 손가락으로 당겨주세요",
-					"msg":           mrow["product_name"],
-					"ios_msg":       mrow["product_name"],
+					"notice_title":  "↓ 두 손가락으로 당겨주세요 ↓",
+					"msg":           msg,
+					"ios_msg":       ios_msg,
 					"attach_img":    mrow["img_url"],
 					"link_url":      mrow["link_url"],
 					"send_ios":      1,
@@ -107,8 +136,27 @@ func CheckRetargetQueueData() {
 					helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > state 업데이트 실패")
 				}
 
-				//1차나, 2차인경우 다음 회차가 있느는거를 체크해서 있으면 시간을 현시간부 5초후 발송
+				// 1차나 2차를 발송 실패한 경우, 회차가 있는지 체크해서 있으면, 다음회차 시간을 현 시간 + 5초후 발송처리
+				send_no, _ := strconv.Atoi(mrow["send_no"])
+				if send_no < 3 {
+					sql = fmt.Sprintf("SELECT * FROM %s WHERE app_udid='%s' AND send_no > %d AND state='%s'", tb_retarget_queue, mrow["app_udid"], send_no, "R")
+					srows, sRecord := mysql.Query("ma", sql)
+					if sRecord > 0 {
+						for _, srow := range srows {
+							new_schedule_time := now.Add(time.Second * 5)
+							// 스케쥴타임만 업데이트
+							f := map[string]interface{}{
+								"schedule_time": new_schedule_time.Unix(),
+								"reg_time":      now_timestamp,
+							}
+							update_queue = mysql.Update("ma", tb_retarget_queue, f, "idx='"+srow["idx"]+"'")
+							if update_queue < 1 {
+								helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > schedule_time 업데이트 실패")
+							}
+						}
+					}
 
+				}
 			}
 		}
 	}
@@ -116,7 +164,6 @@ func CheckRetargetQueueData() {
 
 // 대기열에서 데이터 제거
 func DeleteRetargetQueueData(idx int) {
-	//fmt.Println("target_idx: ", idx)
 	sql := fmt.Sprintf("DELETE FROM %s WHERE idx = '%d'", tb_retarget_queue, idx)
 	_, record := mysql.Query("ma", sql)
 	if record != 0 {
@@ -132,8 +179,8 @@ func DeleteRetargetQueueData(idx int) {
  */
 func InsertOnePushMSGSendsData(push_idx int, app_id string, app_udid string) bool {
 	//fmt.Println("insert 시작")
-	tb_push_users := helper.GetTable("push_users_", app_id)
-	tb_push_msg := helper.GetTable("push_msg_sends_", app_id)
+	tb_push_users := common.GetTable("push_users_", app_id)
+	tb_push_msg := common.GetTable("push_msg_sends_", app_id)
 
 	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s' AND app_udid = '%s'", tb_push_users, app_id, app_udid)
 	mrows, tRecord := mysql.Query("master", sql)
