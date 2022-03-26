@@ -13,7 +13,7 @@ import (
 
 // 리타겟큐 테이블
 const tb_retarget_queue = "BYAPPS_retarget_queue"
-// 리타겟팅 셋팅 정보가 있는 테이블
+// 리타겟팅 설정 정보(menu_type=9 일때 menu_content)가 있는 테이블
 const tb_language_menu_data = "BYAPPS2015_language_menu_data"
 
 /*
@@ -58,7 +58,7 @@ func CheckRetargetQueueData() {
 			schedule_time, _ := time.ParseInLocation("200601021504", timeD, loc)
 
 			if chk == true {
-				// user data 가져오기
+				// #USER# 변수 변환을 위해 회원 아이디 가져오기
 				app_shop_id := "고객"
 				sql = fmt.Sprintf("SELECT app_shop_id FROM %s WHERE app_udid='%s' ORDER BY idx DESC", common.GetTable("push_users_", mrow["app_id"]), mrow["app_udid"])
 				srow, sRecord := mysql.GetRow("master", sql)
@@ -66,20 +66,22 @@ func CheckRetargetQueueData() {
 					app_shop_id = srow["app_shop_id"]
 				}
 
+				// 기본 메시지를 상품명으로 담고 시작
 				msg := mrow["product_name"]
 				ios_msg := mrow["product_name"]
+
 				// language_menu_data에서 리타켓 데이터 가져오기
 				sql = fmt.Sprintf("SELECT menu_content FROM %s WHERE app_id='%s' AND menu_type='9'", tb_language_menu_data, mrow["app_id"])
 				vrow, vRecord := mysql.GetRow("master", sql)
 				if vRecord > 0 {
-					// 가져와서 메시지 변환
 					content := make(map[string]interface{}) 
 					json.Unmarshal([]byte(vrow["menu_content"]), &content)
+					// 변수 변환을 위한 데이터
 					data := map[string]string {
 						"USER" : app_shop_id,
 						"PRODUCT" : mrow["product_name"],
 					}
-					
+					// 메시지 내에 #USER#, #PRODUCT# 변수 변환
 					msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["msg" + mrow["send_no"]]), data)
 					ios_msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["ios_msg" + mrow["send_no"]]), data)
 				} else {
@@ -105,7 +107,6 @@ func CheckRetargetQueueData() {
 					"schedule_time": schedule_time.Unix(),
 					"reg_time":      now_timestamp,
 				}
-
 				insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
 				if insert_res < 1 {
 					helper.Log("error", "retarget_queue.CheckRetargetQueueData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
@@ -136,7 +137,8 @@ func CheckRetargetQueueData() {
 					helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > state 업데이트 실패")
 				}
 
-				// 1차나 2차를 발송 실패한 경우, 회차가 있는지 체크해서 있으면, 다음회차 시간을 현 시간 + 5초후 발송처리
+				// 1차나 2차를 발송 실패한 경우, 다음 회차가 있는지 체크해서 있으면, 다음회차 시간을 현 시간 + 5초후 발송처리
+				// **** 수정필요: 이렇게 하면 1차만 발송실패한 경우, 2차랑 3차가 둘다 업데이트가 되버림 ****
 				send_no, _ := strconv.Atoi(mrow["send_no"])
 				if send_no < 3 {
 					sql = fmt.Sprintf("SELECT * FROM %s WHERE app_udid='%s' AND send_no > %d AND state='%s'", tb_retarget_queue, mrow["app_udid"], send_no, "R")
@@ -155,7 +157,6 @@ func CheckRetargetQueueData() {
 							}
 						}
 					}
-
 				}
 			}
 		}
