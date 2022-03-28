@@ -18,7 +18,7 @@ func CheckScheduledPushData() {
 	defer func() {
 		if v := recover(); v != nil {
 			helper.Log("Error", "CheckScheduledPushData Error", "")
-			common.SendJandiMsg("스케쥴링 푸시 > 스케쥴링 푸시 실행 에러", "스케쥴링 푸시 > 스케쥴링 푸시 실행 에러 발생")
+			common.SendJandiMsg("스케쥴링 푸시 > 스케쥴링 푸시 실행 에러", "스케쥴링 푸시 실행 에러 발생")
 		}
 	}()
 	fmt.Println("체크 시작")
@@ -83,11 +83,10 @@ func CheckScheduledPushData() {
 			schedule_time_data := fmt.Sprintf("%s%s", now.Format("20060102"), mrow["timely"])
 			schedule_time, _ := time.ParseInLocation("200601021504", schedule_time_data, loc)
 
-			//schdule-time으로 이미 발송 여부 체크
-			sql = fmt.Sprintf("select idx from %s where schdule_time='%v' and app_id='%s' and send_group='%s'", common.TB_push_msg_data, schedule_time.Unix(), mrow["app_id"], mrow["idx"])
+			//schdule_time으로 발송 여부 체크
+			sql = fmt.Sprintf("SELECT idx FROM %s WHERE schdule_time='%v' AND app_id='%s' AND send_group='%s'", common.TB_push_msg_data, schedule_time.Unix(), mrow["app_id"], mrow["idx"])
 			idx, _ := strconv.Atoi(mysql.GetOne("master", sql))
 			if idx == 0 {
-
 				// push_msg_data에 데이터 삽입
 				f := map[string]interface{}{
 					"state":         "A",
@@ -115,7 +114,7 @@ func CheckScheduledPushData() {
 					helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow))
 					common.SendJandiMsg("scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow["app_id"]))
 				} else {
-					// push_msg_sends_ 에 데이터 삽입
+					// push_msg_sends_{} 에 데이터 삽입
 					total_cnt, and_cnt, ios_cnt := common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
 					if total_cnt == 0 {
 						helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_sends_%s Insert된 내역이 없음", mrow["app_id"]))

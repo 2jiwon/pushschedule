@@ -5,15 +5,37 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"pushschedule/src/config"
 	"pushschedule/src/helper"
 	"pushschedule/src/mysql"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 )
 
 // 메시지 데이터 넣을 테이블
 const TB_push_msg_data = "push_msg_data"
+
+/*
+* 앱 아이디 기준으로 테이블 이름 찾기
+* 
+* @param
+* 	string tb_name 기준 테이블 명
+*   string app_id 앱 아이디
+*/
+func GetTable(tb_name string, app_id string) string {
+	// a-z가 아닐 경우에는 0
+	test, _ := regexp.MatchString("^[a-z]", app_id)
+	if test == false {
+		tb_name += "0"
+	} else {
+		tb_name += string(app_id[0])
+	}
+	return tb_name
+}
 
 /*
 * 잔디 웹훅 전송 함수
@@ -31,7 +53,7 @@ func SendJandiMsg(desc string, msg string) {
 
 	cdata := []ConnectInfo{
 		{
-			Title : "스케쥴링 푸시",
+			Title : "[PUSHSCHEDULE 알림]",
 			Description : desc,
 			ImageURL : "",
 		},
@@ -63,8 +85,8 @@ func SendJandiMsg(desc string, msg string) {
 */
 func InsertPushMSGSendsData(push_idx int, app_id string) (int, int, int) {
 	//fmt.Println("insert 시작")
-	tb_push_users := helper.GetTable("push_users_", app_id)
-	tb_push_msg := helper.GetTable("push_msg_sends_", app_id)
+	tb_push_users := GetTable("push_users_", app_id)
+	tb_push_msg := GetTable("push_msg_sends_", app_id)
 
 	and_cnt := 0
 	ios_cnt := 0
@@ -220,4 +242,81 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 		}
 		return PDS{}, false
 	}
+}
+
+/*
+* 수집할 상품 code 가져오기
+*
+* @return string
+ */
+ func GetProductCode(data map[string]string) string {
+	product_codes := strings.Split(data["products"], "|")
+	seq, _ := strconv.Atoi(data["custom_seq"])
+	if data["send_type"] == "queue" {
+		if len(product_codes) > seq+1 {
+			seq += 1
+		} else {
+			seq = 0
+		}
+		return product_codes[seq]
+	} else if data["send_type"] == "random" {
+		var i int
+		seed := rand.NewSource(time.Now().UnixNano())
+		random := rand.New(seed)
+		for {
+			i = random.Intn(len(product_codes))
+			if i != seq {
+				break
+			}
+		}
+		return product_codes[i]
+	}
+	return ""
+}
+
+/*
+* 상품 정보 가져오는 함수
+*
+* @param pushdata
+*
+* @return PDS 구조체, 상품존재여부
+ */
+ func GetProductData(pushdata map[string]string) (PDS, bool) {
+	data := PDS{}
+	chk := false
+	if pushdata["action_type"] == "best" || pushdata["action_type"] == "product" {
+		data, chk = GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], "")
+	} else { // custom일때는 op=product로, 상품 code를 같이 API 호출해서 정보 가져오기
+		data, chk = GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
+	}
+
+	if chk == false {
+		helper.Log("error", "pushauto.GetProductData", fmt.Sprintf("상품정보 가져오기 실패-%s", pushdata))
+	}
+
+	return data, chk
+}
+
+/*
+* #name, #price 치환
+*
+* @return string
+ */
+func ConvertProductInfo(msg string, data map[string]string) string {
+	switch {
+		case strings.Contains(msg, "#name#"):
+			msg = strings.Replace(msg, "#name#", data["name"], -1)
+			fallthrough
+		case strings.Contains(msg, "#price#"):
+			msg = strings.Replace(msg, "#price#", data["price"], -1)
+			fallthrough
+		case strings.Contains(msg, "#USER#"):
+			msg = strings.Replace(msg, "#USER#", data["user"], -1)
+			fallthrough
+		case strings.Contains(msg, "#PRODUCT#"):
+			msg = strings.Replace(msg, "#PRODUCT#", data["product"], -1)
+			fallthrough
+		default:
+	}
+	return msg
 }

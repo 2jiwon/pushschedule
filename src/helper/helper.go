@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"regexp"
 	"time"
 )
 
@@ -62,24 +61,6 @@ func IsEvenWeek(week_value int) bool {
 		return true
 	}
 	return false
-}
-
-/*
-* 앱 아이디 기준으로 테이블 이름 찾기
-* 
-* @param
-* 	string tb_name 기준 테이블 명
-*   string app_id 앱 아이디
-*/
-func GetTable(tb_name string, app_id string) string {
-	// a-z가 아닐 경우에는 0
-	test, _ := regexp.MatchString("^[a-z]", app_id)
-	if test == false {
-		tb_name += "0"
-	} else {
-		tb_name += string(app_id[0])
-	}
-	return tb_name
 }
 
 /*
