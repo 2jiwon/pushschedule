@@ -50,7 +50,6 @@ func CheckScheduledPushData() {
 	mrows, tRecord := mysql.Query("master", sql)
 	if tRecord > 0 {
 		for _, mrow := range mrows {
-
 			// 앱서비스가 유효한지 체크
 			if common.IsServiceValid(mrow["app_id"]) == true {
 				if evenWeek == true { // 이번주가 짝수 주이면
