@@ -150,7 +150,7 @@ func CheckRetargetQueueData() {
 							s_send_no, _ := strconv.Atoi(srow["send_no"])
 							if s_send_no == 2 {
 								*p_time = srow["schedule_time"]
-								new_schedule_time = fmt.Sprintf("%d", now.Add(time.Second * 5).Unix())
+								new_schedule_time = now.Add(time.Second * 5).Format("200601021504")
 							}
 							if s_send_no == 3 {
 								new_schedule_time = *p_time
