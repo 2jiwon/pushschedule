@@ -38,6 +38,39 @@ func GetTable(tb_name string, app_id string) string {
 }
 
 /*
+* 앱 상태와 서비스 기간이 유효한지 체크
+*/
+func IsAppValid(app_id string) bool {
+	sql := fmt.Sprintf("SELECT app_process, end_time FROM BYAPPS_apps_data WHERE app_id='%s'", app_id)
+	mrow, tRecord := mysql.GetRow("master", sql)
+	now_timestamp := time.Now().Unix()
+	if tRecord > 0 {
+		app_process, _ := strconv.Atoi(mrow["app_process"])
+		end_time, _ := strconv.ParseInt(mrow["end_time"], 10, 64)
+		if app_process == 7 && end_time <= now_timestamp {
+			return true
+		}
+	}
+	return false
+}
+/*
+*  부가서비스 상태와 서비스 기간이 유효한지 체크
+*/
+func IsServiceValid(app_id string) bool {
+	sql := fmt.Sprintf("SELECT app_process, end_time FROM BYAPPS_MA_data WHERE ma_id='%s'", app_id)
+	mrow, tRecord := mysql.GetRow("master", sql)
+	now_timestamp := time.Now().Unix()
+	if tRecord > 0 {
+		app_process, _ := strconv.Atoi(mrow["app_process"])
+		end_time, _ := strconv.ParseInt(mrow["end_time"], 10, 64)
+		if app_process == 3 && end_time <= now_timestamp {
+			return true
+		}
+	}
+	return false
+}
+
+/*
 * 잔디 웹훅 전송 함수
  */
 func SendJandiMsg(desc string, msg string) {
