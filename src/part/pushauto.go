@@ -109,7 +109,7 @@ func CheckPushAutoData() {
 					"app_id":        mrow["app_id"],
 					"push_type":     "auto",
 					"msg_type":      mrow["msg_type"],
-					"server_group":  mrow["server_group"],
+					"send_group":    mrow["idx"],
 					"app_lang":      mrow["app_lang"],
 					"os":            helper.ConvOS(mrow["os"]),
 					"title":         mrow["title"],
