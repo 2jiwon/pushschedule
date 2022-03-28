@@ -174,7 +174,7 @@ func CheckRetargetQueueData() {
 				}
 			} else {
 				// 서비스가 유효하지 않으면 에러 기록하고 대기열에서 제거
-				helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > 부가서비스 상태가 유효하지 않음")
+				helper.Log("error", "retarget_queue.CheckRetargetQueueData", fmt.Sprintf("%s - 앱서비스,부가서비스 상태가 유효하지 않음", mrow["app_id"]))
 				DeleteRetargetQueueData(target_idx)
 			}
 		}
