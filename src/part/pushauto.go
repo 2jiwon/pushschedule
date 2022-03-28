@@ -88,7 +88,7 @@ func CheckPushAutoData() {
 			}
 
 			// 메시지에 #name, #price 변수 포함되어있으면 치환
-			d := map[string]string {
+			d := map[string]string{
 				"name":  pdsInfo.Name,
 				"price": strconv.Itoa(pdsInfo.Price),
 			}
@@ -153,5 +153,3 @@ func CheckPushAutoData() {
 		helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("%s에서 수집된 데이터가 없음", tb_push_auto_data))
 	}
 }
-
-

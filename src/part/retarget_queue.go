@@ -13,11 +13,12 @@ import (
 
 // 리타겟큐 테이블
 const tb_retarget_queue = "BYAPPS_retarget_queue"
+
 // 리타겟팅 설정 정보(menu_type=9 일때 menu_content)가 있는 테이블
 const tb_language_menu_data = "BYAPPS2015_language_menu_data"
 
 /*
- * 리타겟 큐 푸쉬 데이터 체크
+ * IOS 리타겟 큐 푸쉬 데이터 체크
  */
 func CheckRetargetQueueData() {
 	defer func() {
@@ -74,20 +75,22 @@ func CheckRetargetQueueData() {
 				sql = fmt.Sprintf("SELECT menu_content FROM %s WHERE app_id='%s' AND menu_type='9'", tb_language_menu_data, mrow["app_id"])
 				vrow, vRecord := mysql.GetRow("master", sql)
 				if vRecord > 0 {
-					content := make(map[string]interface{}) 
+					content := make(map[string]interface{})
 					json.Unmarshal([]byte(vrow["menu_content"]), &content)
 					// 변수 변환을 위한 데이터
-					data := map[string]string {
-						"USER" : app_shop_id,
-						"PRODUCT" : mrow["product_name"],
+					data := map[string]string{
+						"USER":    app_shop_id,
+						"PRODUCT": mrow["product_name"],
 					}
 					// 메시지 내에 #USER#, #PRODUCT# 변수 변환
-					msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["msg" + mrow["send_no"]]), data)
-					ios_msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["ios_msg" + mrow["send_no"]]), data)
+					msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["msg"+mrow["send_no"]]), data)
+					ios_msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["ios_msg"+mrow["send_no"]]), data)
+
+					///ddd
 				} else {
 					helper.Log("error", "retarget_queue.CheckRetargetQueueData", "리타겟큐 메시지 셋팅 정보가 없음")
 				}
-	
+
 				// push_msg_data에 데이터 삽입
 				f := map[string]interface{}{
 					"state":         "A",
@@ -140,26 +143,28 @@ func CheckRetargetQueueData() {
 				// 1차나 2차를 발송 실패한 경우, 다음 회차가 있는지 체크해서 있으면, 2차 시간은 현 시간 + 5초후 발송처리 & 3차를 2차로 당김
 				m_send_no, _ := strconv.Atoi(mrow["send_no"])
 				if m_send_no < 3 {
+
 					sql = fmt.Sprintf("SELECT * FROM %s WHERE app_udid='%s' AND send_no > %d AND state='%s' ORDER BY send_no ASC", tb_retarget_queue, mrow["app_udid"], m_send_no, "R")
 					srows, sRecord := mysql.Query("ma", sql)
 					if sRecord > 0 {
-						old_schedule_time := srows[0]["schedule_time"]
-						new_schedule_time := now.String()
-						p_time := &old_schedule_time
+						old_schedule_time := "" //srows[0]["schedule_time"]
+						new_schedule_time := now.Add(time.Second * 5).Format("200601021504")
+						//p_time := &old_schedule_time
+						//현재 꺼의 발송시간 - 현재 시간 차를 구해서
 						for _, srow := range srows {
 							s_send_no, _ := strconv.Atoi(srow["send_no"])
-							if s_send_no == 2 {
-								*p_time = srow["schedule_time"]
-								new_schedule_time = now.Add(time.Second * 5).Format("200601021504")
-							}
-							if s_send_no == 3 {
-								new_schedule_time = *p_time
+							if m_send_no == 1 {
+								if s_send_no == 2 {
+									old_schedule_time = srow["schedule_time"]
+								}
+								if s_send_no == 3 {
+									new_schedule_time = old_schedule_time
+								}
 							}
 
 							// 스케쥴타임만 업데이트
 							f := map[string]interface{}{
 								"schedule_time": new_schedule_time,
-								"reg_time":      now_timestamp,
 							}
 							update_queue = mysql.Update("ma", tb_retarget_queue, f, "idx='"+srow["idx"]+"'")
 							if update_queue < 1 {
@@ -167,6 +172,7 @@ func CheckRetargetQueueData() {
 							}
 						}
 					}
+
 				}
 			}
 		}

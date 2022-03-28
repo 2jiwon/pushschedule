@@ -21,11 +21,11 @@ const TB_push_msg_data = "push_msg_data"
 
 /*
 * 앱 아이디 기준으로 테이블 이름 찾기
-* 
+*
 * @param
 * 	string tb_name 기준 테이블 명
 *   string app_id 앱 아이디
-*/
+ */
 func GetTable(tb_name string, app_id string) string {
 	// a-z가 아닐 경우에는 0
 	test, _ := regexp.MatchString("^[a-z]", app_id)
@@ -39,7 +39,7 @@ func GetTable(tb_name string, app_id string) string {
 
 /*
 * 잔디 웹훅 전송 함수
-*/
+ */
 func SendJandiMsg(desc string, msg string) {
 	type ConnectInfo struct {
 		Title       string `json:"title"`
@@ -47,20 +47,20 @@ func SendJandiMsg(desc string, msg string) {
 		ImageURL    string `json:"imageUrl,omitempty"`
 	}
 	type Payload struct {
-		Body         string        `json:"body"`
-		ConnectInfo  []ConnectInfo `json:"connectInfo"`
+		Body        string        `json:"body"`
+		ConnectInfo []ConnectInfo `json:"connectInfo"`
 	}
 
 	cdata := []ConnectInfo{
 		{
-			Title : "[PUSHSCHEDULE 알림]",
-			Description : desc,
-			ImageURL : "",
+			Title:       "[PUSHSCHEDULE 알림]",
+			Description: desc,
+			ImageURL:    "",
 		},
 	}
 	data := &Payload{
-		Body : msg,
-		ConnectInfo : cdata,
+		Body:        msg,
+		ConnectInfo: cdata,
 	}
 	payloadBytes, err := json.Marshal(data)
 	body := bytes.NewReader(payloadBytes)
@@ -82,7 +82,7 @@ func SendJandiMsg(desc string, msg string) {
 *
 * @return OS 갯수
 *	 total, android, ios
-*/
+ */
 func InsertPushMSGSendsData(push_idx int, app_id string) (int, int, int) {
 	//fmt.Println("insert 시작")
 	tb_push_users := GetTable("push_users_", app_id)
@@ -104,7 +104,7 @@ func InsertPushMSGSendsData(push_idx int, app_id string) (int, int, int) {
 				"push_token": mrow["device_id"],
 				"app_os":     helper.ConvOS(mrow["app_os"]),
 				"reg_time":   time.Now().Unix(),
-			}			
+			}
 			res, _ := mysql.Insert("master", tb_push_msg, data, false)
 			if res < 1 {
 				helper.Log("error", "common.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
@@ -124,11 +124,11 @@ func InsertPushMSGSendsData(push_idx int, app_id string) (int, int, int) {
 
 /*
 * 상품정보를 받기 위한 구조체
-*/
+ */
 type ProductData struct {
 	Result  int    `json:"result"`
 	Message string `json:"message"`
-	Pds []PDS `json:"pds"`
+	Pds     []PDS  `json:"pds"`
 	Request struct {
 		Op    string `json:"op"`
 		AppID string `json:"app_id"`
@@ -159,30 +159,30 @@ type PDS struct {
 * 	method : GET, POST
 *   url
 *   key
-* 
-* @return 
+*
+* @return
 * 	PDS 구조체, error 발생 여부
-*/
+ */
 func CallByappsApi(method string, url string, key string) (ProductData, error) {
 	request, err := http.NewRequest(method, url, nil)
-    if err != nil {
-        return ProductData{}, err
-    }
+	if err != nil {
+		return ProductData{}, err
+	}
 	request.Header.Add("Authorization", key)
-    client := &http.Client{}
-    response, err := client.Do(request)
-    if err != nil {
-        return ProductData{}, err
-    }
-    defer response.Body.Close()
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		return ProductData{}, err
+	}
+	defer response.Body.Close()
 
 	responseBody, _ := ioutil.ReadAll(response.Body)
-    var responseJson ProductData
-    err = json.Unmarshal(responseBody, &responseJson)
-    if err != nil {
-        return ProductData{}, err
-    }
-    return responseJson, nil
+	var responseJson ProductData
+	err = json.Unmarshal(responseBody, &responseJson)
+	if err != nil {
+		return ProductData{}, err
+	}
+	return responseJson, nil
 }
 
 /*
@@ -192,10 +192,10 @@ func CallByappsApi(method string, url string, key string) (ProductData, error) {
 *	app_id
 * 	action_type : best, product, custom
 *	code : 상품 코드
-* 
-* @return 
+*
+* @return
 *	PDS 구조체, 상품 존재 여부
-*/
+ */
 func GetProductFromByapps(app_id string, action_type string, code string) (PDS, bool) {
 	URL := ""
 	if code == "" {
@@ -203,14 +203,14 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 	} else {
 		URL = config.Get("PRODUCT_API") + "/index.php?op=product&app_id=" + app_id + "&code=" + code
 	}
-	
-	pdata, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
-    if err != nil {
-		helper.Log("error", "common.GetProductFromByapps", "BYAPPS API 서버 탐색 실패")
-        return PDS{}, false
-    }
 
-    if pdata.Result == 0 {
+	pdata, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
+	if err != nil {
+		helper.Log("error", "common.GetProductFromByapps", "BYAPPS API 서버 탐색 실패")
+		return PDS{}, false
+	}
+
+	if pdata.Result == 0 {
 		helper.Log("error", "common.GetProductFromByapps", fmt.Sprintf("상품정보 없음 %s", code))
 		return PDS{}, false
 	}
@@ -224,7 +224,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 			}
 		}
 		return best, true
-	// product는 new에서 가장 최신으로
+		// product는 new에서 가장 최신으로
 	} else if action_type == "product" {
 		new := PDS{}
 		for _, val := range pdata.Pds {
@@ -233,7 +233,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 			}
 		}
 		return new, true
-	// custom(선택상품)일때는 code로 지정된 상품 정보
+		// custom(선택상품)일때는 code로 지정된 상품 정보
 	} else {
 		if len(pdata.Pds) > 0 {
 			if pdata.Pds[0].State == "Y" {
@@ -249,7 +249,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 *
 * @return string
  */
- func GetProductCode(data map[string]string) string {
+func GetProductCode(data map[string]string) string {
 	product_codes := strings.Split(data["products"], "|")
 	seq, _ := strconv.Atoi(data["custom_seq"])
 	if data["send_type"] == "queue" {
@@ -281,7 +281,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 *
 * @return PDS 구조체, 상품존재여부
  */
- func GetProductData(pushdata map[string]string) (PDS, bool) {
+func GetProductData(pushdata map[string]string) (PDS, bool) {
 	data := PDS{}
 	chk := false
 	if pushdata["action_type"] == "best" || pushdata["action_type"] == "product" {
@@ -304,19 +304,19 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
  */
 func ConvertProductInfo(msg string, data map[string]string) string {
 	switch {
-		case strings.Contains(msg, "#name#"):
-			msg = strings.Replace(msg, "#name#", data["name"], -1)
-			fallthrough
-		case strings.Contains(msg, "#price#"):
-			msg = strings.Replace(msg, "#price#", data["price"], -1)
-			fallthrough
-		case strings.Contains(msg, "#USER#"):
-			msg = strings.Replace(msg, "#USER#", data["user"], -1)
-			fallthrough
-		case strings.Contains(msg, "#PRODUCT#"):
-			msg = strings.Replace(msg, "#PRODUCT#", data["product"], -1)
-			fallthrough
-		default:
+	case strings.Contains(msg, "#name#"):
+		msg = strings.Replace(msg, "#name#", data["name"], -1)
+		fallthrough
+	case strings.Contains(msg, "#price#"):
+		msg = strings.Replace(msg, "#price#", data["price"], -1)
+		fallthrough
+	case strings.Contains(msg, "#USER#"):
+		msg = strings.Replace(msg, "#USER#", data["user"], -1)
+		fallthrough
+	case strings.Contains(msg, "#PRODUCT#"):
+		msg = strings.Replace(msg, "#PRODUCT#", data["product"], -1)
+		fallthrough
+	default:
 	}
 	return msg
 }

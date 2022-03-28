@@ -18,9 +18,9 @@ func main() {
 	}()
 	scheduling_dtime, _ := strconv.Atoi(config.Get("SCHEDULING_CHECK_DELAY"))
 	for {
-		go part.CheckScheduledPushData()
-		go part.CheckRetargetQueueData()
-		go part.CheckPushAutoData()
+		go part.CheckScheduledPushData() //스케쥴링 푸쉬 데이터 체크
+		go part.CheckRetargetQueueData() //IOS 리타겟 큐 푸쉬 데이터 체크
+		go part.CheckPushAutoData()      // 자동화 푸시 데이터 체크
 		time.Sleep(time.Minute * time.Duration(scheduling_dtime))
 	}
 }
