@@ -51,8 +51,8 @@ func CheckRetargetQueueData() {
 			// idx 정보 먼저 저장
 			target_idx, _ := strconv.Atoi(mrow["idx"])
 
-			// 서비스가 유효한지 체크
-			if common.IsServiceValid(mrow["app_id"]) == true {
+			// 앱서비스와 부가서비스가 유효한지 체크
+			if common.IsAppValid(mrow["app_id"]) == true && common.IsServiceValid(mrow["app_id"]) == true {
 				// 스케쥴 타임을 넣기 위한 포맷 변환
 				timeD := mrow["schedule_time"]
 				schedule_time, _ := time.ParseInLocation("200601021504", timeD, loc)
