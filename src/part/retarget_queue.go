@@ -137,18 +137,28 @@ func CheckRetargetQueueData() {
 					helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > state 업데이트 실패")
 				}
 
-				// 1차나 2차를 발송 실패한 경우, 다음 회차가 있는지 체크해서 있으면, 다음회차 시간을 현 시간 + 5초후 발송처리
-				// **** 수정필요: 이렇게 하면 1차만 발송실패한 경우, 2차랑 3차가 둘다 업데이트가 되버림 ****
-				send_no, _ := strconv.Atoi(mrow["send_no"])
-				if send_no < 3 {
-					sql = fmt.Sprintf("SELECT * FROM %s WHERE app_udid='%s' AND send_no > %d AND state='%s'", tb_retarget_queue, mrow["app_udid"], send_no, "R")
+				// 1차나 2차를 발송 실패한 경우, 다음 회차가 있는지 체크해서 있으면, 2차 시간은 현 시간 + 5초후 발송처리 & 3차를 2차로 당김
+				m_send_no, _ := strconv.Atoi(mrow["send_no"])
+				if m_send_no < 3 {
+					sql = fmt.Sprintf("SELECT * FROM %s WHERE app_udid='%s' AND send_no > %d AND state='%s' ORDER BY send_no ASC", tb_retarget_queue, mrow["app_udid"], m_send_no, "R")
 					srows, sRecord := mysql.Query("ma", sql)
 					if sRecord > 0 {
+						old_schedule_time := srows[0]["schedule_time"]
+						new_schedule_time := now.String()
+						p_time := &old_schedule_time
 						for _, srow := range srows {
-							new_schedule_time := now.Add(time.Second * 5)
+							s_send_no, _ := strconv.Atoi(srow["send_no"])
+							if s_send_no == 2 {
+								*p_time = srow["schedule_time"]
+								new_schedule_time = fmt.Sprintf("%d", now.Add(time.Second * 5).Unix())
+							}
+							if s_send_no == 3 {
+								new_schedule_time = *p_time
+							}
+
 							// 스케쥴타임만 업데이트
 							f := map[string]interface{}{
-								"schedule_time": new_schedule_time.Unix(),
+								"schedule_time": new_schedule_time,
 								"reg_time":      now_timestamp,
 							}
 							update_queue = mysql.Update("ma", tb_retarget_queue, f, "idx='"+srow["idx"]+"'")
