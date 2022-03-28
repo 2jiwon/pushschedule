@@ -2,7 +2,6 @@ package part
 
 import (
 	"fmt"
-	"math/rand"
 	"pushschedule/src/common"
 	"pushschedule/src/config"
 	"pushschedule/src/helper"
@@ -82,61 +81,70 @@ func CheckPushAutoData() {
 				continue
 			}
 
-			// 상품 정보를 가져와서 만약 상품정보가가 없으면 다음으로 패스
-			pdsInfo, chk := GetProductData(mrow)
+			// 상품 정보를 가져와서 만약 상품정보가 없으면 다음으로 패스
+			pdsInfo, chk := common.GetProductData(mrow)
 			if chk == false {
 				continue
 			}
 
-			// 메시지에 변수 포함되어있으면 치환
-			msg := ConvertProductInfo(mrow["msg"], pdsInfo.Name, strconv.Itoa(pdsInfo.Price))
-			ios_msg := ConvertProductInfo(mrow["msg"], pdsInfo.Name, strconv.Itoa(pdsInfo.Price))
+			// 메시지에 #name, #price 변수 포함되어있으면 치환
+			d := map[string]string {
+				"name":  pdsInfo.Name,
+				"price": strconv.Itoa(pdsInfo.Price),
+			}
+			msg := common.ConvertProductInfo(mrow["msg"], d)
+			ios_msg := common.ConvertProductInfo(mrow["ios_msg"], d)
 
 			// 스케쥴타임 넣기 위한 포맷변경
 			schedule_time_data := fmt.Sprintf("%s%s", now.Format("20060102"), mrow["timely"])
 			schedule_time, _ := time.ParseInLocation("200601021504", schedule_time_data, loc)
 
-			// push_msg_data에 데이터 삽입
-			f := map[string]interface{}{
-				"state":         "A",
-				"app_id":        mrow["app_id"],
-				"push_type":     "auto",
-				"msg_type":      mrow["msg_type"],
-				"server_group":  mrow["server_group"],
-				"app_lang":      mrow["app_lang"],
-				"os":            helper.ConvOS(mrow["os"]),
-				"title":         mrow["title"],
-				"notice_title":  mrow["notice_title"],
-				"msg":           msg,
-				"ios_msg":       ios_msg,
-				"attach_img":    mrow["attach_img"],
-				"link_url":      mrow["link_url"],
-				"gcm_color":     mrow["gcm_color"],
-				"target_option": mrow["target_option"],
-				"fcm":           mrow["fcm"],
-				"schedule_time": schedule_time.Unix(),
-				"reg_time":      now.Unix(),
-			}
+			//schdule_time으로 발송 여부 체크
+			sql = fmt.Sprintf("SELECT idx FROM %s WHERE schdule_time='%v' AND app_id='%s' AND send_group='%s'", common.TB_push_msg_data, schedule_time.Unix(), mrow["app_id"], mrow["idx"])
+			idx, _ := strconv.Atoi(mysql.GetOne("master", sql))
+			if idx == 0 {
+				// push_msg_data에 데이터 삽입
+				f := map[string]interface{}{
+					"state":         "A",
+					"app_id":        mrow["app_id"],
+					"push_type":     "auto",
+					"msg_type":      mrow["msg_type"],
+					"server_group":  mrow["server_group"],
+					"app_lang":      mrow["app_lang"],
+					"os":            helper.ConvOS(mrow["os"]),
+					"title":         mrow["title"],
+					"notice_title":  mrow["notice_title"],
+					"msg":           msg,
+					"ios_msg":       ios_msg,
+					"attach_img":    mrow["attach_img"],
+					"link_url":      mrow["link_url"],
+					"gcm_color":     mrow["gcm_color"],
+					"target_option": mrow["target_option"],
+					"fcm":           mrow["fcm"],
+					"schedule_time": schedule_time.Unix(),
+					"reg_time":      now.Unix(),
+				}
 
-			insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
-			if insert_res < 1 {
-				helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow))
-				common.SendJandiMsg("pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow["app_id"]))
-			} else {
-				// push_msg_sends_ 에 데이터 삽입
-				total_cnt, and_cnt, ios_cnt := common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
-				if total_cnt == 0 {
-					helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_sends_%s Insert된 내역이 없음", mrow["app_id"]))
+				insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
+				if insert_res < 1 {
+					helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow))
+					common.SendJandiMsg("pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow["app_id"]))
 				} else {
-					// push_msg_data에 state와 발송수 업데이트
-					d := map[string]interface{}{
-						"state":    "R",
-						"send_and": and_cnt,
-						"send_ios": ios_cnt,
-					}
-					update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='"+strconv.Itoa(res_idx)+"'")
-					if update_res < 1 {
-						helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_data Update 실패- idx : %d", res_idx))
+					// push_msg_sends_ 에 데이터 삽입
+					total_cnt, and_cnt, ios_cnt := common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
+					if total_cnt == 0 {
+						helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_sends_%s Insert된 내역이 없음", mrow["app_id"]))
+					} else {
+						// push_msg_data에 state와 발송수 업데이트
+						d := map[string]interface{}{
+							"state":    "R",
+							"send_and": and_cnt,
+							"send_ios": ios_cnt,
+						}
+						update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='"+strconv.Itoa(res_idx)+"'")
+						if update_res < 1 {
+							helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("push_msg_data Update 실패- idx : %d", res_idx))
+						}
 					}
 				}
 			}
@@ -146,73 +154,4 @@ func CheckPushAutoData() {
 	}
 }
 
-/*
-* 상품 정보 가져오는 함수
-*
-* @param pushdata
-*
-* @return PDS 구조체, 상품존재여부
- */
-func GetProductData(pushdata map[string]string) (common.PDS, bool) {
-	data := common.PDS{}
-	chk := false
-	if pushdata["action_type"] == "best" || pushdata["action_type"] == "product" {
-		data, chk = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], "")
-	} else { // custom일때는 op=product로, 상품 code를 같이 API 호출해서 정보 가져오기
-		data, chk = common.GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
-	}
 
-	fmt.Println(chk)
-
-	if chk == false {
-		helper.Log("error", "pushauto.GetProductData", fmt.Sprintf("상품정보 가져오기 실패-%s", pushdata))
-	}
-
-	return data, chk
-}
-
-/*
-* #name, #price 치환
-*
-* @return string
- */
-func ConvertProductInfo(msg string, name string, price string) string {
-	if strings.Contains(msg, "#name#") {
-		msg = strings.Replace(msg, "#name#", name, -1)
-	}
-	if strings.Contains(msg, "#price#") {
-		msg = strings.Replace(msg, "#price#", price, -1)
-	}
-	return msg
-}
-
-/*
-* 수집할 상품 code 가져오기
-*
-* @return string
- */
-func GetProductCode(data map[string]string) string {
-	product_codes := strings.Split(data["products"], "|")
-	seq, _ := strconv.Atoi(data["custom_seq"])
-	if data["send_type"] == "queue" {
-		if len(product_codes) > seq+1 {
-			seq += 1
-		} else {
-			seq = 0
-		}
-
-		return product_codes[seq]
-	} else if data["send_type"] == "random" {
-		var i int
-		seed := rand.NewSource(time.Now().UnixNano())
-		random := rand.New(seed)
-		for {
-			i = random.Intn(len(product_codes))
-			if i != seq {
-				break
-			}
-		}
-		return product_codes[i]
-	}
-	return ""
-}
