@@ -51,7 +51,7 @@ func CheckScheduledPushData() {
 	if tRecord > 0 {
 		for _, mrow := range mrows {
 			// 앱서비스가 유효한지 체크
-			if common.IsServiceValid(mrow["app_id"]) == true {
+			if common.IsAppValid(mrow["app_id"]) == true {
 				if evenWeek == true { // 이번주가 짝수 주이면
 					if mrow["weekly"] == "biweek" { // 가져온 값이 홀수 주 일때
 						continue
