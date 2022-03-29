@@ -21,7 +21,8 @@ func CheckPushAutoData() {
 			common.SendJandiMsg("스케쥴링 푸시 > 자동화푸시 실행 에러", "스케쥴링 푸시 > 자동화푸시 실행 에러 발생")
 		}
 	}()
-	fmt.Println("자동화푸시 체크 시작")
+	//fmt.Println("자동화푸시 체크 시작")
+	
 	// KST로 timezone 설정
 	now := time.Now()
 	// time parse를 위한 location 지정
