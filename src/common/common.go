@@ -44,9 +44,11 @@ func IsAppValid(app_id string) bool {
 	sql := fmt.Sprintf("SELECT app_process, end_time FROM BYAPPS_apps_data WHERE app_id='%s'", app_id)
 	mrow, tRecord := mysql.GetRow("master", sql)
 	now_timestamp := time.Now().Unix()
+	
 	if tRecord > 0 {
 		app_process, _ := strconv.Atoi(mrow["app_process"])
 		end_time, _ := strconv.ParseInt(mrow["end_time"], 10, 64)
+		fmt.Println(end_time)
 		if app_process == 7 && end_time > now_timestamp {
 			return true
 		}
@@ -56,14 +58,31 @@ func IsAppValid(app_id string) bool {
 /*
 *  부가서비스 상태와 서비스 기간이 유효한지 체크
 */
-func IsServiceValid(app_id string) bool {
-	sql := fmt.Sprintf("SELECT app_process, end_time FROM BYAPPS_MA_data WHERE ma_id='%s'", app_id)
+func IsServiceValid(service string, app_id string) bool {
+	time_column := ""
+	id_column := ""
+	tb_name := ""
+	valid_process := 0
+	switch service {
+		case "ma":
+			time_column = "end_time"
+			id_column = "ma_id"
+			tb_name = "BYAPPS_MA_data"
+			valid_process = 3
+		case "pushauto":
+			time_column = "service_end"
+			id_column = "app_id"
+			tb_name = "BYAPPS_push_auto_data"
+			valid_process = 2
+	}
+	
+	sql := fmt.Sprintf("SELECT app_process, %s FROM %s WHERE %s='%s'", time_column, tb_name, id_column, app_id)
 	mrow, tRecord := mysql.GetRow("master", sql)
 	now_timestamp := time.Now().Unix()
 	if tRecord > 0 {
 		app_process, _ := strconv.Atoi(mrow["app_process"])
-		end_time, _ := strconv.ParseInt(mrow["end_time"], 10, 64)
-		if app_process == 3 && end_time > now_timestamp {
+		end_time, _ := strconv.ParseInt(mrow[time_column], 10, 64)
+		if app_process == valid_process && end_time > now_timestamp {
 			return true
 		}
 	}
