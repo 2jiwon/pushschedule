@@ -190,17 +190,17 @@ type ProductData struct {
 type PDS struct {
 	AppID      string `json:"app_id"`
 	State      string `json:"state"`
-	Code       int    `json:"code,string,omitempty"`
+	Code       int    `json:"code,omitempty"`
 	Name       string `json:"name"`
-	Price      int    `json:"price,string,omitempty"`
+	Price      int    `json:"price,omitempty"`
 	Thum       string `json:"thum"`
 	Link       string `json:"link"`
 	Linkm      string `json:"linkm"`
-	Hits       int    `json:"hits,string,omitempty"`
-	PdUtime    int    `json:"pd_utime,string,omitempty"`
-	PdRtime    int    `json:"pd_rtime,string,omitempty"`
-	UpdateTime int    `json:"update_time,string,omitempty"`
-	Idx        int    `json:"idx,string,omitempty"`
+	Hits       int    `json:"hits,omitempty"`
+	PdUtime    int    `json:"pd_utime,omitempty"`
+	PdRtime    int    `json:"pd_rtime,omitempty"`
+	UpdateTime int    `json:"update_time,omitempty"`
+	Idx        int    `json:"idx,omitempty"`
 }
 
 /*
@@ -257,7 +257,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 
 	pdata, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
 	if err != nil {
-		helper.Log("error", "common.GetProductFromByapps", "BYAPPS API 서버 탐색 실패")
+		helper.Log("error", "common.GetProductFromByapps", fmt.Sprintf("BYAPPS API 서버 탐색 실패 - %s", err))
 		return PDS{}, false
 	}
 
@@ -274,6 +274,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 				best = val
 			}
 		}
+		fmt.Println("베스트", best)
 		return best, true
 		// product는 new에서 가장 최신으로
 	} else if action_type == "product" {
