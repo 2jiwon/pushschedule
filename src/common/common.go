@@ -47,7 +47,7 @@ func IsAppValid(app_id string) bool {
 	if tRecord > 0 {
 		app_process, _ := strconv.Atoi(mrow["app_process"])
 		end_time, _ := strconv.ParseInt(mrow["end_time"], 10, 64)
-		if app_process == 7 && end_time <= now_timestamp {
+		if app_process == 7 && end_time > now_timestamp {
 			return true
 		}
 	}
@@ -63,7 +63,7 @@ func IsServiceValid(app_id string) bool {
 	if tRecord > 0 {
 		app_process, _ := strconv.Atoi(mrow["app_process"])
 		end_time, _ := strconv.ParseInt(mrow["end_time"], 10, 64)
-		if app_process == 3 && end_time <= now_timestamp {
+		if app_process == 3 && end_time > now_timestamp {
 			return true
 		}
 	}
