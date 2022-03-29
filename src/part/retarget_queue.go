@@ -27,7 +27,8 @@ func CheckRetargetQueueData() {
 			common.SendJandiMsg("스케쥴링 푸시 > 리타겟큐 실행 에러", "스케쥴링 푸시 > 리타겟큐 실행 에러 발생")
 		}
 	}()
-	fmt.Println("리타겟 큐 체크 시작")
+
+	//fmt.Println("리타겟 큐 체크 시작")
 
 	now := time.Now()
 	// KST로 timezone 지정
