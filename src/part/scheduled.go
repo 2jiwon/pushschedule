@@ -86,7 +86,7 @@ func CheckScheduledPushData() {
 				schedule_time, _ := time.ParseInLocation("200601021504", schedule_time_data, loc)
 	
 				//schdule_time으로 발송 여부 체크
-				sql = fmt.Sprintf("SELECT idx FROM %s WHERE schdule_time='%v' AND app_id='%s' AND send_group='%s'", common.TB_push_msg_data, schedule_time.Unix(), mrow["app_id"], mrow["idx"])
+				sql = fmt.Sprintf("SELECT idx FROM %s WHERE schedule_time='%v' AND app_id='%s' AND send_group='%s'", common.TB_push_msg_data, schedule_time.Unix(), mrow["app_id"], mrow["idx"])
 				idx, _ := strconv.Atoi(mysql.GetOne("master", sql))
 				if idx == 0 {
 					// push_msg_data에 데이터 삽입
