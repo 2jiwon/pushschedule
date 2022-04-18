@@ -158,8 +158,7 @@ func InsertPushMSGSendsData(push_idx int, app_id string) (int, int, int) {
 			}
 			res, _ := mysql.Insert("master", tb_push_msg, data, false)
 			if res < 1 {
-				helper.Log("error", "common.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패-%s", mrow))
-				SendJandiMsg("common.InsertPushMSGSendsData", fmt.Sprintf("%s 메시지 전송 데이터 삽입 실패 - %d", app_id, push_idx))
+				helper.Log("error", "common.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패 - %s", data))
 			}
 
 			if mrow["app_os"] == "android" {
