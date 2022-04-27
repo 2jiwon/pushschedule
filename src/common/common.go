@@ -189,17 +189,17 @@ type ProductData struct {
 type PDS struct {
 	AppID      string `json:"app_id"`
 	State      string `json:"state"`
-	Code       int    `json:"code,omitempty"`
+	Code       string    `json:"code,omitempty"`
 	Name       string `json:"name"`
-	Price      int    `json:"price,omitempty"`
+	Price      string    `json:"price,omitempty"`
 	Thum       string `json:"thum"`
 	Link       string `json:"link"`
 	Linkm      string `json:"linkm"`
-	Hits       int    `json:"hits,omitempty"`
-	PdUtime    int    `json:"pd_utime,omitempty"`
-	PdRtime    int    `json:"pd_rtime,omitempty"`
-	UpdateTime int    `json:"update_time,omitempty"`
-	Idx        int    `json:"idx,omitempty"`
+	Hits       string  `json:"hits,omitempty"`
+	PdUtime    string  `json:"pd_utime,omitempty"`
+	PdRtime    string  `json:"pd_rtime,omitempty"`
+	UpdateTime string  `json:"update_time,omitempty"`
+	Idx        string    `json:"idx,omitempty"`
 }
 
 /*
@@ -362,10 +362,10 @@ func ConvertProductInfo(msg string, data map[string]string) string {
 		msg = strings.Replace(msg, "#price#", data["price"], -1)
 		fallthrough
 	case strings.Contains(msg, "#USER#"):
-		msg = strings.Replace(msg, "#USER#", data["user"], -1)
+		msg = strings.Replace(msg, "#USER#", data["USER"], -1)
 		fallthrough
 	case strings.Contains(msg, "#PRODUCT#"):
-		msg = strings.Replace(msg, "#PRODUCT#", data["product"], -1)
+		msg = strings.Replace(msg, "#PRODUCT#", data["PRODUCT"], -1)
 		fallthrough
 	default:
 	}
