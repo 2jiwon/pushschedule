@@ -54,120 +54,128 @@ func CheckRetargetQueueData() {
 
 			// 앱서비스와 부가서비스가 유효한지 체크
 			if common.IsAppValid(mrow["app_id"]) == true && common.IsServiceValid("ma", mrow["app_id"]) == true {
-				// 스케쥴 타임을 넣기 위한 포맷 변환
-				timeD := mrow["schedule_time"]
-				schedule_time, _ := time.ParseInLocation("200601021504", timeD, loc)
 
-				// 상품정보 가져오기
-				_, chk := common.GetProductFromByapps(mrow["app_id"], "custom", mrow["product_code"])
-				// 상품정보가 존재하면 
-				if chk == true {
-					// #USER# 변수 변환을 위해 회원 아이디 가져오기
-					app_shop_id := "고객"
-					sql = fmt.Sprintf("SELECT app_shop_id FROM %s WHERE app_udid='%s' ORDER BY idx DESC", common.GetTable("push_users_", mrow["app_id"]), mrow["app_udid"])
-					srow, sRecord := mysql.GetRow("master", sql)
-					if sRecord > 0 {
-						app_shop_id = srow["app_shop_id"]
-					}
+				// send_no가 3보다 크게 들어오는 경우 방지
+				send_no, _ := strconv.Atoi(mrow["send_no"])
+				if send_no <= 3 {
+					// 스케쥴 타임을 넣기 위한 포맷 변환
+					timeD := mrow["schedule_time"]
+					schedule_time, _ := time.ParseInLocation("200601021504", timeD, loc)
 
-					// 기본 메시지를 상품명으로 담고 시작
-					msg := mrow["product_name"]
-					ios_msg := mrow["product_name"]
-
-					// language_menu_data에서 리타켓 데이터 가져오기
-					sql = fmt.Sprintf("SELECT menu_content FROM %s WHERE app_id='%s' AND menu_type='9'", tb_language_menu_data, mrow["app_id"])
-					vrow, vRecord := mysql.GetRow("master", sql)
-					if vRecord > 0 {
-						content := make(map[string]interface{})
-						json.Unmarshal([]byte(vrow["menu_content"]), &content)
-						// 변수 변환을 위한 데이터
-						data := map[string]string{
-							"USER":    app_shop_id,
-							"PRODUCT": mrow["product_name"],
+					// 상품정보 가져오기
+					_, chk := common.GetProductFromByapps(mrow["app_id"], "custom", mrow["product_code"])
+					// 상품정보가 존재하면 
+					if chk == true {
+						// #USER# 변수 변환을 위해 회원 아이디 가져오기
+						app_shop_id := "고객"
+						sql = fmt.Sprintf("SELECT app_shop_id FROM %s WHERE app_udid='%s' ORDER BY idx DESC", common.GetTable("push_users_", mrow["app_id"]), mrow["app_udid"])
+						srow, sRecord := mysql.GetRow("master", sql)
+						if sRecord > 0 {
+							app_shop_id = srow["app_shop_id"]
 						}
-						// 메시지 내에 #USER#, #PRODUCT# 변수 변환
-						msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["msg"+mrow["send_no"]]), data)
-						ios_msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["ios_msg"+mrow["send_no"]]), data)
 
-						// push_msg_data에 데이터 삽입
-						f := map[string]interface{}{
-							"state":         "A",
-							"app_id":        mrow["app_id"],
-							"push_type":     "retarget",
-							"msg_type":      "retarget",
-							"send_group":    mrow["idx"],
-							"app_lang":      mrow["lang"],
-							"os":            helper.ConvOS(mrow["app_os"]),
-							"title":         mrow["product_name"],
-							"notice_title":  "↓ 두 손가락으로 당겨주세요 ↓",
-							"msg":           msg,
-							"ios_msg":       ios_msg,
-							"attach_img":    mrow["img_url"],
-							"link_url":      mrow["link_url"],
-							"send_ios":      1,
-							"schedule_time": schedule_time.Unix(),
-							"reg_time":      now_timestamp,
-						}
-						insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
-						if insert_res < 1 {
-							helper.Log("error", "retarget_queue.CheckRetargetQueueData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
-						} else {
-							// push_msg_sends_ 에 데이터 삽입
-							result := InsertOnePushMSGSendsData(res_idx, mrow["app_id"], mrow["app_udid"])
-							if result == true {
-								// push_msg_data에 state 업데이트
-								d := map[string]interface{}{
-									"state": "R",
-								}
-								update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='"+strconv.Itoa(res_idx)+"'")
-								if update_res < 1 {
-									helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > state 업데이트 실패")
-								}
+						// 기본 메시지를 상품명으로 담고 시작
+						msg := mrow["product_name"]
+						ios_msg := mrow["product_name"]
+
+						// language_menu_data에서 리타켓 데이터 가져오기
+						sql = fmt.Sprintf("SELECT menu_content FROM %s WHERE app_id='%s' AND menu_type='9'", tb_language_menu_data, mrow["app_id"])
+						vrow, vRecord := mysql.GetRow("master", sql)
+						if vRecord > 0 {
+							content := make(map[string]interface{})
+							json.Unmarshal([]byte(vrow["menu_content"]), &content)
+							// 변수 변환을 위한 데이터
+							data := map[string]string{
+								"USER":    app_shop_id,
+								"PRODUCT": mrow["product_name"],
 							}
-							// 대기열에서 데이터 제거
-							DeleteRetargetQueueData(target_idx)
+							// 메시지 내에 #USER#, #PRODUCT# 변수 변환
+							msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["msg"+mrow["send_no"]]), data)
+							ios_msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["ios_msg"+mrow["send_no"]]), data)
+
+							fmt.Println("msg : ", msg)
+
+							// push_msg_data에 데이터 삽입
+							f := map[string]interface{}{
+								"state":         "A",
+								"app_id":        mrow["app_id"],
+								"push_type":     "retarget",
+								"msg_type":      "retarget",
+								"send_group":    mrow["idx"],
+								"app_lang":      mrow["lang"],
+								"os":            helper.ConvOS(mrow["app_os"]),
+								"title":         mrow["product_name"],
+								"notice_title":  "↓ 두 손가락으로 당겨주세요 ↓",
+								"msg":           msg,
+								"ios_msg":       ios_msg,
+								"attach_img":    mrow["img_url"],
+								"link_url":      mrow["link_url"],
+								"send_ios":      1,
+								"schedule_time": schedule_time.Unix(),
+								"reg_time":      now_timestamp,
+							}
+							insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
+							fmt.Println("insert_res : ", insert_res)
+							if insert_res < 1 {
+								helper.Log("error", "retarget_queue.CheckRetargetQueueData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
+							} else {
+								// push_msg_sends_ 에 데이터 삽입
+								result := InsertOnePushMSGSendsData(res_idx, mrow["app_id"], mrow["app_udid"])
+								if result == true {
+									// push_msg_data에 state 업데이트
+									d := map[string]interface{}{
+										"state": "R",
+									}
+									update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='"+strconv.Itoa(res_idx)+"'")
+									if update_res < 1 {
+										helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > state 업데이트 실패")
+									}
+								}
+								// 대기열에서 데이터 제거
+								DeleteRetargetQueueData(target_idx)
+							}
+						} else {
+							helper.Log("error", "retarget_queue.CheckRetargetQueueData", "리타겟큐 메시지 셋팅 정보가 없음")
 						}
 					} else {
-						helper.Log("error", "retarget_queue.CheckRetargetQueueData", "리타겟큐 메시지 셋팅 정보가 없음")
-					}
-				} else {
-					helper.Log("error", "retarget_queue.CheckRetargetQueueData", "상품 정보 취득 실패, 발송 실패 처리")
+						helper.Log("error", "retarget_queue.CheckRetargetQueueData", "상품 정보 취득 실패, 발송 실패 처리")
 
-					// 상품정보를 못 가져왔으면 처리결과를 실패로 업데이트
-					d := map[string]interface{}{
-						"state": "N",
-					}
-					update_queue := mysql.Update("ma", tb_retarget_queue, d, "idx='"+mrow["idx"]+"'")
-					if update_queue < 1 {
-						helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > state 업데이트 실패")
-					}
+						// 상품정보를 못 가져왔으면 처리결과를 실패로 업데이트
+						d := map[string]interface{}{
+							"state": "N",
+						}
+						update_queue := mysql.Update("ma", tb_retarget_queue, d, "idx='"+mrow["idx"]+"'")
+						if update_queue < 1 {
+							helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > state 업데이트 실패")
+						}
 
-					// 1차나 2차를 발송 실패한 경우, 다음 회차가 있는지 체크해서 있으면, 2차 시간은 현 시간 + 5초후 발송처리 & 3차를 2차로 당김
-					m_send_no, _ := strconv.Atoi(mrow["send_no"])
-					if m_send_no < 3 {
-						sql = fmt.Sprintf("SELECT * FROM %s WHERE app_udid='%s' AND send_no > %d AND state='%s' ORDER BY send_no ASC", tb_retarget_queue, mrow["app_udid"], m_send_no, "R")
-						srows, sRecord := mysql.Query("ma", sql)
-						if sRecord > 0 {
-							old_schedule_time := ""
-							new_schedule_time := now.Add(time.Second * 5).Format("200601021504")
-							for _, srow := range srows {
-								s_send_no, _ := strconv.Atoi(srow["send_no"])
-								if m_send_no == 1 {
-									if s_send_no == 2 {
-										old_schedule_time = srow["schedule_time"]
+						// 1차나 2차를 발송 실패한 경우, 다음 회차가 있는지 체크해서 있으면, 2차 시간은 현 시간 + 5초후 발송처리 & 3차를 2차로 당김
+						m_send_no, _ := strconv.Atoi(mrow["send_no"])
+						if m_send_no < 3 {
+							sql = fmt.Sprintf("SELECT * FROM %s WHERE app_udid='%s' AND send_no > %d AND state='%s' ORDER BY send_no ASC", tb_retarget_queue, mrow["app_udid"], m_send_no, "R")
+							srows, sRecord := mysql.Query("ma", sql)
+							if sRecord > 0 {
+								old_schedule_time := ""
+								new_schedule_time := now.Add(time.Second * 5).Format("200601021504")
+								for _, srow := range srows {
+									s_send_no, _ := strconv.Atoi(srow["send_no"])
+									if m_send_no == 1 {
+										if s_send_no == 2 {
+											old_schedule_time = srow["schedule_time"]
+										}
+										if s_send_no == 3 {
+											new_schedule_time = old_schedule_time
+										}
 									}
-									if s_send_no == 3 {
-										new_schedule_time = old_schedule_time
-									}
-								}
 
-								// 스케쥴타임만 업데이트
-								f := map[string]interface{}{
-									"schedule_time": new_schedule_time,
-								}
-								update_queue = mysql.Update("ma", tb_retarget_queue, f, "idx='"+srow["idx"]+"'")
-								if update_queue < 1 {
-									helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > schedule_time 업데이트 실패")
+									// 스케쥴타임만 업데이트
+									f := map[string]interface{}{
+										"schedule_time": new_schedule_time,
+									}
+									update_queue = mysql.Update("ma", tb_retarget_queue, f, "idx='"+srow["idx"]+"'")
+									if update_queue < 1 {
+										helper.Log("error", "retarget_queue.CheckRetargetQueueData", "retarget_queue > schedule_time 업데이트 실패")
+									}
 								}
 							}
 						}
