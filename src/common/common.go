@@ -187,19 +187,19 @@ type ProductData struct {
 }
 
 type PDS struct {
-	AppID      string `json:"app_id"`
-	State      string `json:"state"`
-	Code       string    `json:"code,omitempty"`
-	Name       string `json:"name"`
-	Price      string    `json:"price,omitempty"`
-	Thum       string `json:"thum"`
-	Link       string `json:"link"`
-	Linkm      string `json:"linkm"`
+	AppID      string  `json:"app_id"`
+	State      string  `json:"state"`
+	Code       string  `json:"code,omitempty"`
+	Name       string  `json:"name"`
+	Price      string  `json:"price,omitempty"`
+	Thum       string  `json:"thum"`
+	Link       string  `json:"link"`
+	Linkm      string  `json:"linkm"`
 	Hits       string  `json:"hits,omitempty"`
 	PdUtime    string  `json:"pd_utime,omitempty"`
 	PdRtime    string  `json:"pd_rtime,omitempty"`
 	UpdateTime string  `json:"update_time,omitempty"`
-	Idx        string    `json:"idx,omitempty"`
+	Idx        string  `json:"idx,omitempty"`
 }
 
 /*
