@@ -93,7 +93,7 @@ func CheckPushAutoData() {
 				// 메시지에 #name, #price 변수 포함되어있으면 치환
 				d := map[string]string{
 					"name":  pdsInfo.Name,
-					"price": strconv.Itoa(pdsInfo.Price),
+					"price": pdsInfo.Price,
 				}
 				msg := common.ConvertProductInfo(mrow["msg"], d)
 				ios_msg := common.ConvertProductInfo(mrow["ios_msg"], d)
