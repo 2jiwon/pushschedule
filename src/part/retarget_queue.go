@@ -93,8 +93,6 @@ func CheckRetargetQueueData() {
 							msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["msg"+mrow["send_no"]]), data)
 							ios_msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["ios_msg"+mrow["send_no"]]), data)
 
-							fmt.Println("msg : ", msg)
-
 							// push_msg_data에 데이터 삽입
 							f := map[string]interface{}{
 								"state":         "A",
@@ -115,7 +113,7 @@ func CheckRetargetQueueData() {
 								"reg_time":      now_timestamp,
 							}
 							insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
-							fmt.Println("insert_res : ", insert_res)
+							// fmt.Println("insert_res : ", insert_res)
 							if insert_res < 1 {
 								helper.Log("error", "retarget_queue.CheckRetargetQueueData", fmt.Sprintf("메시지 데이터 삽입 실패-%s", mrow))
 							} else {
