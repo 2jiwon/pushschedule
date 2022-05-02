@@ -66,14 +66,8 @@ func CheckRetargetQueueData() {
 					_, chk := common.GetProductFromByapps(mrow["app_id"], "custom", mrow["product_code"])
 					// 상품정보가 존재하면 
 					if chk == true {
-						// #USER# 변수 변환을 위해 회원 아이디 가져오기
-						app_shop_id := "고객"
-						sql = fmt.Sprintf("SELECT app_shop_id FROM %s WHERE app_udid='%s' ORDER BY idx DESC", common.GetTable("push_users_", mrow["app_id"]), mrow["app_udid"])
-						srow, sRecord := mysql.GetRow("master", sql)
-						if sRecord > 0 {
-							app_shop_id = srow["app_shop_id"]
-						}
-
+						// #USER# 변수 변환을 여기에서 안하고 앱에서 하기로 변경됨
+						
 						// 기본 메시지를 상품명으로 담고 시작
 						msg := mrow["product_name"]
 						ios_msg := mrow["product_name"]
@@ -86,7 +80,6 @@ func CheckRetargetQueueData() {
 							json.Unmarshal([]byte(vrow["menu_content"]), &content)
 							// 변수 변환을 위한 데이터
 							data := map[string]string{
-								"USER":    app_shop_id,
 								"PRODUCT": mrow["product_name"],
 							}
 							// 메시지 내에 #USER#, #PRODUCT# 변수 변환
