@@ -82,7 +82,7 @@ func CheckRetargetQueueData() {
 							data := map[string]string{
 								"PRODUCT": mrow["product_name"],
 							}
-							// 메시지 내에 #USER#, #PRODUCT# 변수 변환
+							// 메시지 내에 #PRODUCT# 변수 변환
 							msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["msg"+mrow["send_no"]]), data)
 							ios_msg = common.ConvertProductInfo(fmt.Sprintf("%v", content["ios_msg"+mrow["send_no"]]), data)
 
@@ -124,6 +124,8 @@ func CheckRetargetQueueData() {
 								}
 								// 대기열에서 데이터 제거
 								DeleteRetargetQueueData(target_idx)
+								// retarget_push_stat, retarget_push_day_log 업데이트
+								UpdateRetargetStat(mrow["app_id"])
 							}
 						} else {
 							helper.Log("error", "retarget_queue.CheckRetargetQueueData", "리타겟큐 메시지 셋팅 정보가 없음")
@@ -189,6 +191,95 @@ func DeleteRetargetQueueData(idx int) {
 		helper.Log("error", "retarget_queue.DeleteRetargetQueueData", "retarget_queue 대기열 제거 실패")
 		common.SendJandiMsg("retarget_queue.DeleteRetargetQueueData", "retarget_queue 대기열 제거 실패")
 	}
+}
+
+/*
+* 리타겟팅 발송 통계 테이블 업데이트
+*
+*/
+func UpdateRetargetStat(app_id string) bool {
+	tb_retarget_push_stat := "BYAPPS2016_retarget_push_stat"
+	tb_retarget_push_day_log := "BYAPPS2016_retarget_push_day_log"
+	
+	todate :=  time.Now().Format("2006/01/02")
+
+	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id='%s' AND app_os='ios' AND device='app'", tb_retarget_push_stat, app_id)
+	srow, sRecord := mysql.GetRow("ma", sql)
+	if sRecord == 0 {
+		// insert
+		f := map[string]interface{}{
+			"app_id": app_id,
+			"app_os": "ios",
+			"todate": todate,
+			"launch_date": todate,
+			"reg_date": time.Now().Format("2006-01-02 15:04:05"),
+		}
+		insert_res, _ := mysql.Insert("ma", tb_retarget_push_stat, f, true)
+		if insert_res < 1 {
+			helper.Log("error", "retarget_queue.UpdateRetargetStat", "retarget_push_stat 테이블 삽입 실패")
+			return false
+		}
+	} else {
+		// update
+		total_c, _ := strconv.Atoi(srow["total_c"])
+		today_c, _ := strconv.Atoi(srow["today_c"])
+		max_c, _ := strconv.Atoi(srow["max_c"])
+
+		f := map[string]interface{}{
+			"total_c" : total_c + 1,
+		}
+		if srow["todate"] == todate {
+			f["today_c"] = today_c + 1
+		} else {
+			f["today_c"] = 1
+			f["yesterday_c"] = today_c
+			f["todate"] = todate
+			// 최고치 갱신
+			if today_c > max_c {
+				f["max_c"] = today_c
+				f["max_c_date"] = todate
+			}
+		}
+		update_res := mysql.Update("ma", tb_retarget_push_stat, f, "idx='"+srow["idx"]+"'")
+		if update_res < 1 {
+			helper.Log("error", "retarget_queue.UpdateRetargetStat", "retarget_push_stat 테이블 업데이트 실패")
+			return false
+		}
+	}
+
+	ymd := time.Now().Format("20060102")
+	week := time.Now().Weekday()
+	sql = fmt.Sprintf("SELECT * FROM %s WHERE app_id='%s' AND app_os='ios' AND device='app' AND ymd='%s'", tb_retarget_push_day_log, app_id, ymd)
+	vrow, vRecord := mysql.GetRow("ma", tb_retarget_push_day_log)
+	if vRecord == 0 {
+		// insert
+		d := map[string]interface{}{
+			"app_id" : app_id,
+			"app_os" : "ios",
+			"ymd" : ymd,
+			"week" : int(week),
+			"visit_count" : 1,
+			"reg_time" : time.Now().Unix(),
+		}
+		insert_res, _ := mysql.Insert("ma", tb_retarget_push_day_log, d, true)
+		if insert_res < 1 {
+			helper.Log("error", "retarget_queue.UpdateRetargetStat", "retarget_push_day_log 테이블 삽입 실패")
+			return false
+		}
+	} else {
+		// update
+		visit_count, _ := strconv.Atoi(vrow["visit_count"])
+		d := map[string]interface{}{
+			"visit_count" : visit_count + 1,
+		}
+		update_res := mysql.Update("ma", tb_retarget_push_day_log, d, "idx='"+vrow["idx"]+"'")
+		if update_res < 1 {
+			helper.Log("error", "retarget_queue.UpdateRetargetStat", "retarget_push_day_log 테이블 업데이트 실패")
+			return false
+		}
+	}
+
+	return true
 }
 
 /*
