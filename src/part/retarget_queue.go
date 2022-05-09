@@ -197,7 +197,7 @@ func DeleteRetargetQueueData(idx int) {
 * 리타겟팅 발송 통계 테이블 업데이트
 *
 */
-func UpdateRetargetStat(app_id string) bool {
+func UpdateRetargetStat(app_id string) {
 	tb_retarget_push_stat := "BYAPPS2016_retarget_push_stat"
 	tb_retarget_push_day_log := "BYAPPS2016_retarget_push_day_log"
 	
@@ -217,7 +217,6 @@ func UpdateRetargetStat(app_id string) bool {
 		insert_res, _ := mysql.Insert("ma", tb_retarget_push_stat, f, true)
 		if insert_res < 1 {
 			helper.Log("error", "retarget_queue.UpdateRetargetStat", "retarget_push_stat 테이블 삽입 실패")
-			return false
 		}
 	} else {
 		// update
@@ -243,7 +242,6 @@ func UpdateRetargetStat(app_id string) bool {
 		update_res := mysql.Update("ma", tb_retarget_push_stat, f, "idx='"+srow["idx"]+"'")
 		if update_res < 1 {
 			helper.Log("error", "retarget_queue.UpdateRetargetStat", "retarget_push_stat 테이블 업데이트 실패")
-			return false
 		}
 	}
 
@@ -264,7 +262,6 @@ func UpdateRetargetStat(app_id string) bool {
 		insert_res, _ := mysql.Insert("ma", tb_retarget_push_day_log, d, true)
 		if insert_res < 1 {
 			helper.Log("error", "retarget_queue.UpdateRetargetStat", "retarget_push_day_log 테이블 삽입 실패")
-			return false
 		}
 	} else {
 		// update
@@ -275,11 +272,8 @@ func UpdateRetargetStat(app_id string) bool {
 		update_res := mysql.Update("ma", tb_retarget_push_day_log, d, "idx='"+vrow["idx"]+"'")
 		if update_res < 1 {
 			helper.Log("error", "retarget_queue.UpdateRetargetStat", "retarget_push_day_log 테이블 업데이트 실패")
-			return false
 		}
 	}
-
-	return true
 }
 
 /*
