@@ -248,7 +248,7 @@ func UpdateRetargetStat(app_id string) {
 	ymd := time.Now().Format("20060102")
 	week := time.Now().Weekday()
 	sql = fmt.Sprintf("SELECT * FROM %s WHERE app_id='%s' AND app_os='ios' AND device='app' AND ymd='%s'", tb_retarget_push_day_log, app_id, ymd)
-	vrow, vRecord := mysql.GetRow("ma", tb_retarget_push_day_log)
+	vrow, vRecord := mysql.GetRow("ma", sql)
 	if vRecord == 0 {
 		// insert
 		d := map[string]interface{}{
