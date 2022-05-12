@@ -111,28 +111,29 @@ func CheckScheduledPushData() {
 						"reg_time":      now.Unix(),
 					}
 	
-					insert_res, res_idx := mysql.Insert("master", common.TB_push_msg_data, f, true)
+					insert_res, _ := mysql.Insert("master", common.TB_push_msg_data, f, true)
 					if insert_res < 1 {
 						helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow))
 						common.SendJandiMsg("scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Insert 실패-%s", mrow["app_id"]))
-					} else {
-						// push_msg_sends_{} 에 데이터 삽입
-						total_cnt, and_cnt, ios_cnt := common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
-						if total_cnt == 0 {
-							helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_sends_%s Insert된 내역이 없음", mrow["app_id"]))
-						} else {
-							// push_msg_data에 state와 발송수 업데이트
-							d := map[string]interface{}{
-								"state":    "R",
-								"send_and": and_cnt,
-								"send_ios": ios_cnt,
-							}
-							update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='"+strconv.Itoa(res_idx)+"'")
-							if update_res < 1 {
-								helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Update 실패- idx : %d", res_idx))
-							}
-						}
-					}
+					} 
+					// else {
+					// 	// push_msg_sends_{} 에 데이터 삽입
+					// 	total_cnt, and_cnt, ios_cnt := common.InsertPushMSGSendsData(res_idx, mrow["app_id"])
+					// 	if total_cnt == 0 {
+					// 		helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_sends_%s Insert된 내역이 없음", mrow["app_id"]))
+					// 	} else {
+					// 		// push_msg_data에 state와 발송수 업데이트
+					// 		d := map[string]interface{}{
+					// 			"state":    "R",
+					// 			"send_and": and_cnt,
+					// 			"send_ios": ios_cnt,
+					// 		}
+					// 		update_res := mysql.Update("master", common.TB_push_msg_data, d, "idx='"+strconv.Itoa(res_idx)+"'")
+					// 		if update_res < 1 {
+					// 			helper.Log("error", "scheduled.CheckScheduledPushData", fmt.Sprintf("push_msg_data Update 실패- idx : %d", res_idx))
+					// 		}
+					// 	}
+					// }
 				}
 			} else {
 				// 서비스가 유효하지 않으면 에러 기록하고 넘어감
