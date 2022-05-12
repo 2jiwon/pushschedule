@@ -108,7 +108,7 @@ func CheckPushAutoData() {
 				if idx == 0 {
 					// push_msg_data에 데이터 삽입
 					f := map[string]interface{}{
-						"state":         "A",
+						"state":         "R",
 						"app_id":        mrow["app_id"],
 						"push_type":     "auto",
 						"msg_type":      mrow["msg_type"],
