@@ -249,9 +249,9 @@ func CallByappsApi(method string, url string, key string) (ProductData, error) {
 func GetProductFromByapps(app_id string, action_type string, code string) (PDS, bool) {
 	URL := ""
 	if code == "" {
-		URL = config.Get("PRODUCT_API") + "/index.php?op=new&app_id=" + app_id
+		URL = config.Get("PRODUCT_API") + "/index.php?op=new&app_id=" + app_id + "&direct=Y"
 	} else {
-		URL = config.Get("PRODUCT_API") + "/index.php?op=product&app_id=" + app_id + "&code=" + code
+		URL = config.Get("PRODUCT_API") + "/index.php?op=product&app_id=" + app_id + "&code=" + code + "&direct=Y"
 	}
 
 	pdata, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
