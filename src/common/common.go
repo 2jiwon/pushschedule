@@ -360,6 +360,7 @@ func ConvertProductInfo(msg string, data map[string]string) string {
 		fallthrough
 	case strings.Contains(msg, "#price#"):
 		msg = strings.Replace(msg, "#price#", data["price"], -1)
+		msg = strings.Replace(msg, ".00", "", -1)
 		fallthrough
 	case strings.Contains(msg, "#PRODUCT#"):
 		msg = strings.Replace(msg, "#PRODUCT#", data["PRODUCT"], -1)
