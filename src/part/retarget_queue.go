@@ -196,12 +196,11 @@ func DeleteRetargetQueueData(idx int) {
 
 /*
 * 리타겟팅 발송 통계 테이블 업데이트
-*
+* 
+* BYAPPS2016_retarget_push_day_log 는 SENDPUSH 모듈에서 업데이트 함
 */
 func UpdateRetargetStat(app_id string) {
-	tb_retarget_push_stat := "BYAPPS2016_retarget_push_stat"
-	tb_retarget_push_day_log := "BYAPPS2016_retarget_push_day_log"
-	
+	tb_retarget_push_stat := "BYAPPS2016_retarget_push_stat"		
 	todate :=  time.Now().Format("2006/01/02")
 
 	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id='%s' AND app_os='ios' AND device='app'", tb_retarget_push_stat, app_id)
@@ -243,36 +242,6 @@ func UpdateRetargetStat(app_id string) {
 		update_res := mysql.Update("ma", tb_retarget_push_stat, f, "idx='"+srow["idx"]+"'")
 		if update_res < 1 {
 			helper.Log("error", "retarget_queue.UpdateRetargetStat", "retarget_push_stat 테이블 업데이트 실패")
-		}
-	}
-
-	ymd := time.Now().Format("20060102")
-	week := time.Now().Weekday()
-	sql = fmt.Sprintf("SELECT * FROM %s WHERE app_id='%s' AND app_os='ios' AND device='app' AND ymd='%s'", tb_retarget_push_day_log, app_id, ymd)
-	vrow, vRecord := mysql.GetRow("ma", sql)
-	if vRecord == 0 {
-		// insert
-		d := map[string]interface{}{
-			"app_id" : app_id,
-			"app_os" : "ios",
-			"ymd" : ymd,
-			"week" : int(week),
-			"visit_count" : 1,
-			"reg_time" : time.Now().Unix(),
-		}
-		insert_res, _ := mysql.Insert("ma", tb_retarget_push_day_log, d, true)
-		if insert_res < 1 {
-			helper.Log("error", "retarget_queue.UpdateRetargetStat", "retarget_push_day_log 테이블 삽입 실패")
-		}
-	} else {
-		// update
-		visit_count, _ := strconv.Atoi(vrow["visit_count"])
-		d := map[string]interface{}{
-			"visit_count" : visit_count + 1,
-		}
-		update_res := mysql.Update("ma", tb_retarget_push_day_log, d, "idx='"+vrow["idx"]+"'")
-		if update_res < 1 {
-			helper.Log("error", "retarget_queue.UpdateRetargetStat", "retarget_push_day_log 테이블 업데이트 실패")
 		}
 	}
 }
