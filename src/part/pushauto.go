@@ -97,7 +97,7 @@ func CheckPushAutoData() {
 					"price": pdsInfo.Price,
 				}
 				msg := common.ConvertProductInfo(mrow["msg"], d)
-				ios_msg := common.ConvertProductInfo(mrow["ios_msg"], d)
+				ios_msg := common.ConvertProductInfo(mrow["msg"], d)
 	
 				// 스케쥴타임 넣기 위한 포맷변경
 				schedule_time_data := fmt.Sprintf("%s%s", now.Format("20060102"), mrow["timely"])
