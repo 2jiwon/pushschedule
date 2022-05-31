@@ -46,7 +46,8 @@ func CheckPushAutoData() {
 	const tb_push_auto_data = "BYAPPS2019_push_auto_data"
 
 	// 자동화푸시 테이블에서 데이터 가져오기
-	sql := fmt.Sprintf("SELECT * FROM %s WHERE action_on = 1", tb_push_auto_data)
+	sql := fmt.Sprintf("SELECT * FROM %s WHERE action_on = 1 AND app_id in ('demoapp','byappsdemo','pepepopo')", tb_push_auto_data)
+	// sql := fmt.Sprintf("SELECT * FROM %s WHERE action_on = 1", tb_push_auto_data)
 	mrows, tRecord := mysql.Query("master", sql)
 	if tRecord > 0 {
 		for _, mrow := range mrows {
