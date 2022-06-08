@@ -46,7 +46,7 @@ func CheckScheduledPushData() {
 	const tb_push_schedule_data = "BYAPPS2015_push_schedule_data"
 
 	// 스케쥴 테이블에서 데이터 가져오기
-	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id in ('demoapp','byappsdemo','pepepopo')", tb_push_schedule_data)
+	sql := fmt.Sprintf("SELECT * FROM %s", tb_push_schedule_data)
 	// sql := fmt.Sprintf("SELECT * FROM %s", tb_push_schedule_data)
 	mrows, tRecord := mysql.Query("master", sql)
 	if tRecord > 0 {
