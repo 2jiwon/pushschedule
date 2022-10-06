@@ -253,7 +253,7 @@ func UpdateRetargetStat(app_id string) {
  */
 func InsertOnePushMSGSendsData(push_idx int, app_id string, app_udid string) bool {
 	//fmt.Println("insert 시작")
-	tb_push_users := common.GetTable("push_users_", app_id)
+	tb_push_users := "BYAPPS2015_push_data"
 	tb_push_msg := common.GetTable("push_msg_sends_", app_id)
 
 	sql := fmt.Sprintf("SELECT * FROM %s WHERE app_id = '%s' AND app_udid = '%s'", tb_push_users, app_id, app_udid)
