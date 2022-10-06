@@ -1,2 +1,5 @@
 .env
+*.out
 log
+output.txt
+*-dev
