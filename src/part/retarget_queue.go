@@ -132,7 +132,7 @@ func CheckRetargetQueueData() {
 							helper.Log("error", "retarget_queue.CheckRetargetQueueData", "리타겟큐 메시지 셋팅 정보가 없음")
 						}
 					} else {
-						helper.Log("error", "retarget_queue.CheckRetargetQueueData", "상품 정보 취득 실패, 발송 실패 처리")
+						helper.Log("error", "retarget_queue.CheckRetargetQueueData", fmt.Sprintf("%s - 상품 정보 취득 실패(%s), 발송 실패 처리", mrow["app_id"], mrow["product_code"]))
 
 						// 상품정보를 못 가져왔으면 처리결과를 실패로 업데이트
 						d := map[string]interface{}{

@@ -158,7 +158,7 @@ func InsertPushMSGSendsData(push_idx int, app_id string) (int, int, int) {
 			}
 			res, _ := mysql.Insert("master", tb_push_msg, data, false)
 			if res < 1 {
-				helper.Log("error", "common.InsertPushMSGSendsData", fmt.Sprintf("메시지 전송 데이터 삽입 실패 - %s", data))
+				helper.Log("error", "common.InsertPushMSGSendsData", fmt.Sprintf("%s - 메시지 전송(%d) 데이터 삽입 실패 - %s", app_id, push_idx, data))
 			}
 
 			if mrow["app_os"] == "android" {
@@ -256,12 +256,12 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 
 	pdata, err := CallByappsApi("GET", URL, config.Get("PRODUCT_KEY"))
 	if err != nil {
-		helper.Log("error", "common.GetProductFromByapps", fmt.Sprintf("BYAPPS API 서버 탐색 실패 - %s", err))
+		helper.Log("error", "common.GetProductFromByapps", fmt.Sprintf("%s - BYAPPS API 서버 탐색 실패 - %s", app_id, err))
 		return PDS{}, false
 	}
 
 	if pdata.Result == 0 {
-		helper.Log("error", "common.GetProductFromByapps", fmt.Sprintf("상품정보 없음 %s", code))
+		helper.Log("error", "common.GetProductFromByapps", fmt.Sprintf("%s - 상품정보 없음(%s)", app_id, code))
 		return PDS{}, false
 	}
 
@@ -350,7 +350,7 @@ func GetProductData(pushdata map[string]string) (PDS, bool) {
 	}
 
 	if chk == false || data == (PDS{}) {
-		helper.Log("error", "pushauto.GetProductData", fmt.Sprintf("상품정보 가져오기 실패-%s", pushdata))
+		helper.Log("error", "common.GetProductData", fmt.Sprintf("상품정보 가져오기 실패-%s", pushdata))
 	}
 
 	return data, chk

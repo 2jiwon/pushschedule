@@ -163,7 +163,7 @@ func CheckPushAutoData() {
 				}
 			} else {
 				// 서비스가 유효하지 않으면 에러 기록하고 넘어감
-				helper.Log("error", "scheduled.CheckPushAutoData", fmt.Sprintf("%s - 앱 서비스 상태가 유효하지 않음", mrow["app_id"]))
+				helper.Log("error", "pushauto.CheckPushAutoData", fmt.Sprintf("%s - 앱 서비스 상태가 유효하지 않음", mrow["app_id"]))
 				continue
 			}
 		}
