@@ -273,9 +273,13 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 				best = val
 			}
 		}
-		fmt.Println("베스트", best)
-		return best, true
-		// product는 new에서 가장 최신으로
+
+		if best == PDS{} {
+			return PDS{}, false
+		} else {
+			return best, true
+		}
+	// product는 new에서 가장 최신으로
 	} else if action_type == "product" {
 		new := PDS{}
 		for _, val := range pdata.Pds {
@@ -283,8 +287,12 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 				new = val
 			}
 		}
-		return new, true
-		// custom(선택상품)일때는 code로 지정된 상품 정보
+		if new == PDS{} {
+			return PDS{}, false
+		} else {
+			return new, true
+		}
+	// custom(선택상품)일때는 code로 지정된 상품 정보
 	} else {
 		if len(pdata.Pds) > 0 {
 			if pdata.Pds[0].State == "Y" {
@@ -341,7 +349,7 @@ func GetProductData(pushdata map[string]string) (PDS, bool) {
 		data, chk = GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
 	}
 
-	if chk == false {
+	if chk == false || data == PDS{} {
 		helper.Log("error", "pushauto.GetProductData", fmt.Sprintf("상품정보 가져오기 실패-%s", pushdata))
 	}
 
