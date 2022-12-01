@@ -97,7 +97,7 @@ func CheckRetargetQueueData() {
 								//"os":            helper.ConvOS(mrow["app_os"]),
 								"os" :           "S",
 								"title":         mrow["product_name"],
-								"notice_title":  "↓ 두 손가락으로 당겨주세요 ↓",
+								"notice_title":  "↓ 당겨주세요 ↓",
 								"msg":           msg,
 								"ios_msg":       ios_msg,
 								"attach_img":    mrow["img_url"],
