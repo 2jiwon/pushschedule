@@ -90,6 +90,10 @@ func CheckPushAutoData() {
 				if chk == false {
 					continue
 				}
+
+				if mrow["app_id"] == "looknone" {
+					helper.Log("prddata", "pushauto.CheckPushAutoData", fmt.Sprintf("상품정보-%s", pdsInfo))
+				}
 	
 				// 메시지에 #name, #price 변수 포함되어있으면 치환
 				d := map[string]string{
@@ -98,6 +102,10 @@ func CheckPushAutoData() {
 				}
 				msg := common.ConvertProductInfo(mrow["msg"], d)
 				ios_msg := common.ConvertProductInfo(mrow["msg"], d)
+
+				if mrow["app_id"] == "looknone" {
+					helper.Log("prddata", "pushauto.CheckPushAutoData", fmt.Sprintf("치환된메시지-%s", msg))
+				}
 	
 				// 스케쥴타임 넣기 위한 포맷변경
 				schedule_time_data := fmt.Sprintf("%s%s", now.Format("20060102"), mrow["timely"])
