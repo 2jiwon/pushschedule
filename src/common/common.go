@@ -274,7 +274,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 			}
 		}
 
-		if best == PDS{} {
+		if best == (PDS{}) {
 			return PDS{}, false
 		} else {
 			return best, true
@@ -287,7 +287,7 @@ func GetProductFromByapps(app_id string, action_type string, code string) (PDS, 
 				new = val
 			}
 		}
-		if new == PDS{} {
+		if new == (PDS{}) {
 			return PDS{}, false
 		} else {
 			return new, true
@@ -349,7 +349,7 @@ func GetProductData(pushdata map[string]string) (PDS, bool) {
 		data, chk = GetProductFromByapps(pushdata["app_id"], pushdata["action_type"], GetProductCode(pushdata))
 	}
 
-	if chk == false || data == PDS{} {
+	if chk == false || data == (PDS{}) {
 		helper.Log("error", "pushauto.GetProductData", fmt.Sprintf("상품정보 가져오기 실패-%s", pushdata))
 	}
 
